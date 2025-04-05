@@ -1,20 +1,13 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-// This approach is taken from https://github.com/vercel/next.js/tree/canary/examples/with-mongodb
 import {
   MongoClient,
   ServerApiVersion,
   type MongoClientOptions,
 } from "mongodb";
+import { env } from "~/env";
 
-if (!process.env.MONGODB_URI) {
-  throw new Error('Invalid/Missing environment variable: "MONGODB_URI"');
-}
-
-const uri = process.env.MONGODB_URI;
+const uri = env.MONGODB_URI;
 const options: MongoClientOptions = {
   serverApi: {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
