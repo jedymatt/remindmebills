@@ -1,4 +1,6 @@
+import { headers } from "next/headers";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { LatestPost } from "~/app/_components/post";
 import { auth } from "~/server/auth";
@@ -6,7 +8,9 @@ import { api, HydrateClient } from "~/trpc/server";
 
 export default async function Home() {
   const hello = await api.post.hello({ text: "from tRPC" });
-  const session = await auth();
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
 
   if (session?.user) {
     void api.post.getLatest.prefetch();
@@ -52,12 +56,29 @@ export default async function Home() {
               <p className="text-center text-2xl text-white">
                 {session && <span>Logged in as {session.user?.name}</span>}
               </p>
-              <Link
-                href={session ? "/api/auth/signout" : "/api/auth/signin"}
-                className="rounded-full bg-white/10 px-10 py-3 font-semibold no-underline transition hover:bg-white/20"
-              >
-                {session ? "Sign out" : "Sign in"}
-              </Link>
+              {session ? (
+                <form
+                  action={async () => {
+                    "use server";
+                    await auth.api.signOut({
+                      headers: await headers(),
+                    });
+                    // Redirect to home page
+                    redirect("/");
+                  }}
+                >
+                  <button className="rounded-full bg-white/10 px-10 py-3 font-semibold no-underline transition hover:bg-white/20">
+                    {"Sign out"}
+                  </button>
+                </form>
+              ) : (
+                <Link
+                  href={"/signin"}
+                  className="rounded-full bg-white/10 px-10 py-3 font-semibold no-underline transition hover:bg-white/20"
+                >
+                  {session ? "Sign out" : "Sign in"}
+                </Link>
+              )}
             </div>
           </div>
 

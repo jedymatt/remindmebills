@@ -16,11 +16,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@auth/mongodb-adapter": "^3.8.0",
     "@t3-oss/env-nextjs": "^0.12.0",
     "@tanstack/react-query": "^5.69.0",
     "@trpc/client": "^11.0.0",
     "@trpc/react-query": "^11.0.0",
     "@trpc/server": "^11.0.0",
+    "better-auth": "^1.2.5",
+    "mongodb": "^6.15.0",
     "next": "^15.2.3",
     "next-auth": "5.0.0-beta.25",
     "react": "^19.0.0",
