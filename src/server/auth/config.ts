@@ -13,6 +13,7 @@ export const authConfig = {
       clientSecret: env.AUTH_GOOGLE_SECRET,
     },
   },
+  trustedOrigins: ["https://www.remindmebills.com"],
   account: {
     modelName: "accounts",
   },
