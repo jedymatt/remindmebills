@@ -1,11 +1,11 @@
 import type { ObjectId } from "mongodb";
 
+// todo: follow the type of rrule.js
 export interface Recurrence {
-  type: "daily" | "weekly" | "monthly" | "yearly";
+  type: "weekly" | "monthly";
   interval: number;
   daysOfWeek?: number[];
   daysOfMonth?: number[];
-  monthsOfYear?: number[];
   start?: Date;
   end?: Date;
   termInMonths?: number;

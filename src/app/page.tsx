@@ -1,10 +1,10 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import Link from "next/link";
 import { Button } from "~/components/ui/button";
 import { auth } from "~/server/auth";
 import { api, HydrateClient } from "~/trpc/server";
-import { BillList } from "./_components/billList";
 
 export default async function Home() {
   const session = await auth.api.getSession({
@@ -58,12 +58,15 @@ export default async function Home() {
                   Sign in
                 </Button>
               )}
+
+              {session?.user && (
+                <Button variant="link" asChild>
+                  <Link href="/dashboard">Go to Dashboard</Link>
+                </Button>
+              )}
             </div>
           </div>
-
-          {/* {session?.user && <LatestPost />} */}
         </div>
-        {session?.user && <BillList />}
       </main>
     </HydrateClient>
   );
