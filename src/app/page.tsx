@@ -38,25 +38,25 @@ export default async function Home() {
                   <Button>{"Sign out"}</Button>
                 </form>
               ) : (
-                <form
-                  action={async () => {
+                <Button
+                  onClick={async () => {
                     "use server";
                     const response = await auth.api.signInSocial({
                       body: {
                         provider: "google",
+                        callbackURL: "/dashboard",
                       },
                     });
 
                     if (response.redirect && response.url) {
-                      console.log({ url: response.url });
                       redirect(response.url);
                     } else {
                       console.error("Sign in failed", response);
                     }
                   }}
                 >
-                  <Button>Sign in</Button>
-                </form>
+                  Sign in
+                </Button>
               )}
             </div>
           </div>

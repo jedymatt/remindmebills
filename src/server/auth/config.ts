@@ -1,5 +1,6 @@
 import type { BetterAuthOptions } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
+import { nextCookies } from "better-auth/next-js";
 import { env } from "~/env";
 import { db as client } from "~/server/db";
 
@@ -13,6 +14,7 @@ export const authConfig = {
       clientSecret: env.AUTH_GOOGLE_SECRET,
     },
   },
+  plugins: [nextCookies()],
   account: {
     modelName: "accounts",
   },
