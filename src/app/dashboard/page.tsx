@@ -23,7 +23,7 @@ export default function Dashboard() {
           Sign Out
         </Button>
       </nav>
-      <div className="flex-grow">
+      <div className="flex-grow p-6">
         <BillList />
       </div>
     </div>
