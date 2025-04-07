@@ -33,46 +33,42 @@ export function HomePage() {
   if (isPending) return null;
 
   return (
-    <main className="p-2">
-      <div>
-        <div className="flex flex-col items-center gap-2">
-          <div className="flex flex-col items-center justify-center gap-4">
-            <p className="text-center text-2xl text-white">
-              {session && <span>Logged in as {session.user?.name}</span>}
-            </p>
-            {session ? (
-              <Button
-                onClick={async () => {
-                  await authClient.signOut({
-                    fetchOptions: {
-                      onSuccess: () => router.push("/"),
-                    },
-                  });
-                }}
-              >
-                Sign out
-              </Button>
-            ) : (
-              <Button
-                onClick={async () => {
-                  await authClient.signIn.social({
-                    provider: "google",
-                    callbackURL: "/dashboard",
-                  });
-                }}
-              >
-                Sign in with Google{" "}
-                <SimpleIconsGoogle className="ml-1 inline size-4" />
-              </Button>
-            )}
-
-            {session?.user && (
-              <Button variant="link" asChild>
-                <Link href="/dashboard">Go to Dashboard</Link>
-              </Button>
-            )}
+    <main className="flex h-full min-h-screen flex-col items-center justify-center p-2">
+      <div className="flex flex-col items-center justify-center gap-4">
+        <p className="text-center text-2xl font-bold">
+          {session && <span>Logged in as {session.user.name}</span>}
+        </p>
+        {session ? (
+          <div className="flex gap-2">
+            <Button
+              onClick={async () => {
+                await authClient.signOut({
+                  fetchOptions: {
+                    onSuccess: () => router.push("/"),
+                  },
+                });
+              }}
+              variant={"ghost"}
+            >
+              Sign out
+            </Button>
+            <Button asChild>
+              <Link href="/dashboard">Go to Dashboard</Link>
+            </Button>
           </div>
-        </div>
+        ) : (
+          <Button
+            onClick={async () => {
+              await authClient.signIn.social({
+                provider: "google",
+                callbackURL: "/dashboard",
+              });
+            }}
+          >
+            Sign in with Google{" "}
+            <SimpleIconsGoogle className="ml-1 inline size-4" />
+          </Button>
+        )}
       </div>
     </main>
   );
