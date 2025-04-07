@@ -6,7 +6,7 @@ import { Button } from "~/components/ui/button";
 import { auth } from "~/server/auth";
 import { api, HydrateClient } from "~/trpc/server";
 
-export function SimpleIconsGoogle(props: SVGProps<SVGSVGElement>) {
+function SimpleIconsGoogle(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
