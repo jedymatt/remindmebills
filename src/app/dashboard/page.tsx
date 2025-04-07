@@ -1,5 +1,5 @@
 import { DashboardPage } from "~/components/dashboardPage";
 
-export default async function Dashboard() {
+export default function Dashboard() {
   return <DashboardPage />;
 }

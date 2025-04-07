@@ -9,10 +9,11 @@ import { Button } from "./ui/button";
 import { useState } from "react";
 import { LoaderCircle } from "lucide-react";
 
+const authClient = createAuthClient();
+
 export function DashboardPage() {
   const { data: incomeProfile, isLoading: isIncomeProfileLoading } =
     api.income.getIncomeProfile.useQuery();
-  const authClient = createAuthClient();
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
