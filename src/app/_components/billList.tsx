@@ -1,5 +1,6 @@
 "use client";
 
+import assert from "assert";
 import { addMonths, formatDate, isAfter } from "date-fns";
 import { sumBy } from "lodash";
 import { RRule } from "rrule";
@@ -28,12 +29,15 @@ export function BillList() {
   const { data: incomeProfile, isLoading: isIncomeProfileLoading } =
     api.income.getIncomeProfile.useQuery();
 
+  assert(incomeProfile, "Income profile is required");
+
   const isLoading = isBillLoading || isIncomeProfileLoading;
+  const randomSkeletonCount = Math.floor(Math.random() * 5) + 1;
 
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {Array.from({ length: 3 }).map((_, index) => (
+        {Array.from({ length: randomSkeletonCount }).map((_, index) => (
           <Card key={index} className="h-auto">
             <CardHeader>
               <CardTitle>
@@ -60,28 +64,9 @@ export function BillList() {
     );
   }
 
-  if (!incomeProfile) {
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {bills?.map((bill) => (
-        <Card key={bill._id}>
-          <CardHeader>
-            <CardTitle>{bill.title}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {bill.date?.toLocaleDateString("en-PH")}
-            {bill.amount?.toLocaleString("en-PH", {
-              style: "currency",
-              currency: "PHP",
-            })}
-          </CardContent>
-        </Card>
-      ))}
-    </div>;
-  }
-
   const payRule = new RRule({
-    dtstart: incomeProfile!.startDate,
-    ...getFrequency(incomeProfile!.payFrequency),
+    dtstart: incomeProfile.startDate,
+    ...getFrequency(incomeProfile.payFrequency),
   });
 
   const currentPay = payRule.before(new Date(), true)!;
