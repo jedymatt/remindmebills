@@ -1,6 +1,5 @@
 "use client";
 
-import assert from "assert";
 import { addMonths, formatDate, isAfter } from "date-fns";
 import { sumBy } from "lodash";
 import { RRule } from "rrule";
@@ -14,6 +13,7 @@ import {
 import { Skeleton } from "~/components/ui/skeleton";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
+import { IncomeProfileSetup } from "./incomeProfile";
 
 function getFrequency(freq: "weekly" | "fortnightly" | "monthly") {
   const frequency = {
@@ -28,8 +28,6 @@ export function BillList() {
   const { data: bills, isLoading: isBillLoading } = api.bill.getAll.useQuery();
   const { data: incomeProfile, isLoading: isIncomeProfileLoading } =
     api.income.getIncomeProfile.useQuery();
-
-  assert(incomeProfile, "Income profile is required");
 
   const isLoading = isBillLoading || isIncomeProfileLoading;
   const randomSkeletonCount = Math.floor(Math.random() * 5) + 1;
@@ -60,6 +58,16 @@ export function BillList() {
             </CardFooter>
           </Card>
         ))}
+      </div>
+    );
+  }
+
+  if (!incomeProfile) {
+    return (
+      <div className="flex items-center justify-center">
+        <div className="max-auto w-full max-w-md">
+          <IncomeProfileSetup />
+        </div>
       </div>
     );
   }

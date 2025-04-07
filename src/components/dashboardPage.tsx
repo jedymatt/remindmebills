@@ -2,18 +2,13 @@
 
 import { createAuthClient } from "better-auth/react";
 import { useRouter } from "next/navigation";
-import { BillList } from "~/app/_components/billList";
-import { IncomeProfileSetup } from "~/app/_components/incomeProfile";
-import { api } from "~/trpc/react";
-import { Button } from "./ui/button";
 import { useState } from "react";
-import { LoaderCircle } from "lucide-react";
+import { BillList } from "~/app/_components/billList";
+import { Button } from "./ui/button";
 
 const authClient = createAuthClient();
 
 export function DashboardPage() {
-  const { data: incomeProfile, isLoading: isIncomeProfileLoading } =
-    api.income.getIncomeProfile.useQuery();
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
@@ -38,19 +33,7 @@ export function DashboardPage() {
         </Button>
       </nav>
       <div className="flex-grow p-6">
-        {isIncomeProfileLoading && (
-          <div className="flex items-center justify-center">
-            <LoaderCircle className="animate-spin" />
-          </div>
-        )}
-        {!isIncomeProfileLoading && incomeProfile && <BillList />}
-        {!isIncomeProfileLoading && !incomeProfile && (
-          <div className="flex items-center justify-center">
-            <div className="max-auto w-full max-w-md">
-              <IncomeProfileSetup />
-            </div>
-          </div>
-        )}
+        <BillList />
       </div>
     </div>
   );
