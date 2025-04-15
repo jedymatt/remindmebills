@@ -1,6 +1,13 @@
 "use client";
 
-import { addMonths, formatDate, isAfter, isBefore } from "date-fns";
+import {
+  addMonths,
+  formatDate,
+  isAfter,
+  isBefore,
+  isEqual,
+  subDays,
+} from "date-fns";
 import { sumBy } from "lodash";
 import { RRule } from "rrule";
 import {
@@ -88,7 +95,7 @@ export function BillList() {
       ?.map((bill) => {
         if (bill.type === "single") {
           if (
-            isAfter(bill.date, payDate) &&
+            (isAfter(bill.date, payDate) || isEqual(bill.date, payDate)) &&
             isBefore(bill.date, payRule.after(payDate)!)
           ) {
             return [bill];
@@ -111,7 +118,13 @@ export function BillList() {
 
         // next pay date
         const nextPayDate = payRule.after(payDate)!;
-        const billDates = billRule.between(payDate, nextPayDate);
+        const billDates = billRule
+          .between(payDate, nextPayDate, true)
+          .filter(
+            (date) =>
+              (isAfter(date, payDate) || isEqual(date, payDate)) &&
+              isBefore(date, nextPayDate),
+          );
 
         return billDates.map((date) => ({
           ...bill,
@@ -140,7 +153,7 @@ export function BillList() {
           <CardHeader>
             <CardTitle>
               {formatDate(payDate, "MMMM dd, yyyy")} -{" "}
-              {after && formatDate(after, "MMMM dd, yyyy")}
+              {after && formatDate(subDays(after, 1), "MMMM dd, yyyy")}
             </CardTitle>
           </CardHeader>
           <CardContent className="flex-1 space-y-1">
