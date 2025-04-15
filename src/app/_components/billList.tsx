@@ -1,6 +1,6 @@
 "use client";
 
-import { addMonths, formatDate, isAfter } from "date-fns";
+import { addMonths, formatDate, isAfter, isBefore } from "date-fns";
 import { sumBy } from "lodash";
 import { RRule } from "rrule";
 import {
@@ -85,21 +85,28 @@ export function BillList() {
 
   const billsInPayPeriod = paysUntilFutureMonths.map((payDate) => {
     const currentBills = bills
-      ?.flatMap((bill) => {
-        const { recurrence } = bill;
+      ?.map((bill) => {
+        if (bill.type === "single") {
+          if (
+            isAfter(bill.date, payDate) &&
+            isBefore(bill.date, payRule.after(payDate)!)
+          ) {
+            return [bill];
+          }
 
-        if (!recurrence) {
           return [];
         }
+
+        const { recurrence } = bill;
 
         const billRule = new RRule({
           ...getFrequency(recurrence.type),
           interval: recurrence.interval,
           // need to pass payDate as fallback so it will capture the periods after that date
           // in the future, fallback won't be needed as we can just override the event when we can create bills.
-          dtstart: recurrence.start ?? payDate,
+          dtstart: recurrence.dtstart ?? payDate,
           bymonthday: recurrence.bymonthday,
-          until: recurrence.end,
+          until: recurrence.until,
         });
 
         // next pay date
@@ -111,6 +118,7 @@ export function BillList() {
           date,
         }));
       })
+      .flat()
       .filter((bill) => bill !== null)
       .sort((a, b) => (isAfter(a.date, b.date) ? 1 : -1));
 

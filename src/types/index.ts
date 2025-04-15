@@ -4,21 +4,28 @@ import type { ObjectId } from "mongodb";
 export interface Recurrence {
   type: "weekly" | "monthly";
   interval: number;
-  daysOfWeek?: number[];
   bymonthday?: number[];
-  start?: Date;
-  end?: Date;
+  dtstart?: Date;
+  until?: Date;
   termInMonths?: number;
 }
+
+export type Single = {
+  type: "single";
+  date: Date;
+};
+
+export type Recurring = {
+  type: "recurring";
+  recurrence: Recurrence;
+};
 
 export type BillEvent = {
   _id: string;
   title: string;
-  date?: Date;
-  recurrence?: Recurrence;
   amount?: number;
   userId: ObjectId;
-};
+} & (Single | Recurring);
 
 export interface IncomeProfile {
   payFrequency: "weekly" | "fortnightly" | "monthly";
