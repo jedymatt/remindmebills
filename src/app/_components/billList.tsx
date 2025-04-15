@@ -30,12 +30,11 @@ export function BillList() {
     api.income.getIncomeProfile.useQuery();
 
   const isLoading = isBillLoading || isIncomeProfileLoading;
-  const randomSkeletonCount = Math.floor(Math.random() * 5) + 1;
 
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {Array.from({ length: randomSkeletonCount }).map((_, index) => (
+        {Array.from({ length: 5 }).map((_, index) => (
           <Card key={index} className="h-auto">
             <CardHeader>
               <CardTitle>
