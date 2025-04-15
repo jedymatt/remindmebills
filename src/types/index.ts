@@ -5,7 +5,7 @@ export interface Recurrence {
   type: "weekly" | "monthly";
   interval: number;
   daysOfWeek?: number[];
-  daysOfMonth?: number[];
+  bymonthday?: number[];
   start?: Date;
   end?: Date;
   termInMonths?: number;

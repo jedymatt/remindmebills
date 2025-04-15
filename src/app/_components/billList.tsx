@@ -98,7 +98,7 @@ export function BillList() {
           // need to pass payDate as fallback so it will capture the periods after that date
           // in the future, fallback won't be needed as we can just override the event when we can create bills.
           dtstart: recurrence.start ?? payDate,
-          bymonthday: recurrence.daysOfMonth,
+          bymonthday: recurrence.bymonthday,
           until: recurrence.end,
         });
 
