@@ -9,9 +9,7 @@ export const incomeRouter = createTRPCRouter({
       .collection<IncomeProfile>("income_profiles")
       .findOne({ userId: new ObjectId(ctx.session.user.id) });
 
-    return incomeProfile
-      ? { ...incomeProfile, _id: incomeProfile._id.toString() }
-      : null;
+    return incomeProfile;
   }),
 
   createIncomeProfile: protectedProcedure

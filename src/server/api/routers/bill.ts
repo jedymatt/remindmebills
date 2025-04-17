@@ -10,10 +10,6 @@ export const billRouter = createTRPCRouter({
     const bills = await billsCursor.toArray();
     await billsCursor.close();
 
-    return bills.map((bill) => ({
-      ...bill,
-      _id: bill._id.toString(),
-      userId: bill.userId.toString(),
-    }));
+    return bills;
   }),
 });
