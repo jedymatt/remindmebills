@@ -33,7 +33,7 @@ export function HomePage() {
   if (isPending) return null;
 
   return (
-    <main className="flex h-full min-h-svh flex-col items-center justify-center p-2">
+    <main className="flex min-h-svh flex-col items-center justify-center p-2">
       <div className="flex flex-col items-center justify-center gap-4">
         <p className="text-center text-2xl font-bold">
           {session && <span>Logged in as {session.user.name}</span>}
