@@ -33,13 +33,13 @@ export function HomePage() {
   if (isPending) return null;
 
   return (
-    <main>
-      <div className="flex h-svh flex-col items-center justify-center gap-4">
-        <p className="text-center text-2xl font-bold">
-          {session && <span>Logged in as {session.user.name}</span>}
-        </p>
-        {session ? (
-          <div className="flex gap-2">
+    <main className="flex min-h-svh flex-col items-center justify-center">
+      {session ? (
+        <div className="space-y-4">
+          <p className="text-center text-2xl font-bold">
+            Logged in as {session.user.name}
+          </p>
+          <div className="flex flex-row items-center justify-center gap-2">
             <Button
               onClick={async () => {
                 await authClient.signOut({
@@ -56,20 +56,20 @@ export function HomePage() {
               <Link href="/dashboard">Go to Dashboard</Link>
             </Button>
           </div>
-        ) : (
-          <Button
-            onClick={async () => {
-              await authClient.signIn.social({
-                provider: "google",
-                callbackURL: "/dashboard",
-              });
-            }}
-          >
-            Sign in with Google{" "}
-            <SimpleIconsGoogle className="ml-1 inline size-4" />
-          </Button>
-        )}
-      </div>
+        </div>
+      ) : (
+        <Button
+          onClick={async () => {
+            await authClient.signIn.social({
+              provider: "google",
+              callbackURL: "/dashboard",
+            });
+          }}
+        >
+          Sign in with Google{" "}
+          <SimpleIconsGoogle className="ml-1 inline size-4" />
+        </Button>
+      )}
     </main>
   );
 }
