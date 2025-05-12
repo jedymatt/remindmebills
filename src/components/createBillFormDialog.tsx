@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { CalendarPlus } from "lucide-react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -59,25 +60,39 @@ const RecurringBillFormValues = BaseBillFormValues.extend({
   }),
 });
 
-const CreateBillFormValues = z.discriminatedUnion("type", [
-  SingleBillFormValues,
-  RecurringBillFormValues,
-]);
+const CreateBillFormValues = BaseBillFormValues.extend({
+  type: z.enum(["single", "recurring"]),
+  date: z.coerce.date().optional(),
+  recurrence: RecurringBillFormValues.shape.recurrence.optional(),
+}).refine((data) => {
+  if (data.type === "single") {
+    return SingleBillFormValues.safeParse(data).success;
+  }
+  return RecurringBillFormValues.safeParse(data).success;
+});
 
 type CreateBillFormValues = z.infer<typeof CreateBillFormValues>;
 
 export function CreateBillFormDialog() {
+  const [open, setOpen] = useState(false);
   const form = useForm<CreateBillFormValues>({
     resolver: zodResolver(CreateBillFormValues),
     defaultValues: {
       title: "",
       type: "single",
+      recurrence: {
+        type: "monthly",
+        interval: 1,
+      },
     },
   });
   const utils = api.useUtils();
   const createBill = api.bill.create.useMutation({
     onSuccess: async () => {
       await utils.bill.getAll.invalidate();
+      form.reset();
+      setOpen(false);
+
       toast("Bill created successfully.");
     },
   });
@@ -85,11 +100,27 @@ export function CreateBillFormDialog() {
   const isSingle = form.watch("type") === "single";
 
   async function onSubmit(data: CreateBillFormValues) {
-    await createBill.mutateAsync(data);
+    if (data.type === "single") {
+      const parsedData = SingleBillFormValues.parse(data);
+      await createBill.mutateAsync(parsedData);
+    }
+
+    if (data.type === "recurring") {
+      const parsedData = RecurringBillFormValues.parse(data);
+      await createBill.mutateAsync(parsedData);
+    }
   }
 
   return (
-    <Dialog onOpenChange={(open) => !open && form.reset()}>
+    <Dialog
+      open={open}
+      onOpenChange={(open) => {
+        setOpen(open);
+        if (!open) {
+          form.reset();
+        }
+      }}
+    >
       <DialogTrigger asChild>
         <Button>
           New Bill <CalendarPlus />
@@ -132,7 +163,7 @@ export function CreateBillFormDialog() {
                     <FormLabel>Type</FormLabel>
                     <Select
                       onValueChange={field.onChange}
-                      defaultValue="single"
+                      defaultValue={field.value}
                     >
                       <FormControl>
                         <SelectTrigger className="w-full">
@@ -209,7 +240,7 @@ export function CreateBillFormDialog() {
                         <FormLabel>Type</FormLabel>
                         <Select
                           onValueChange={field.onChange}
-                          defaultValue="monthly"
+                          defaultValue={field.value}
                         >
                           <FormControl>
                             <SelectTrigger className="w-full">
@@ -236,7 +267,6 @@ export function CreateBillFormDialog() {
                             type="number"
                             placeholder="Interval"
                             {...field}
-                            value={field.value ?? 1}
                           />
                         </FormControl>
                         <FormMessage />
