@@ -20,7 +20,7 @@ import {
 import { Skeleton } from "~/components/ui/skeleton";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
-import { IncomeProfileSetup } from "./incomeProfile";
+import { IncomeProfileSetup } from "../../components/createIncomeProfileForm";
 
 function getFrequency(freq: "weekly" | "fortnightly" | "monthly") {
   const frequency = {

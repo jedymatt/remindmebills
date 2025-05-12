@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import { CreateBillFormDialog } from "./createBillFormDialog";
 
 const authClient = createAuthClient();
 
@@ -67,7 +68,10 @@ export function DashboardPage() {
       <nav className="flex h-14 items-center justify-end border-b px-6">
         <UserNav />
       </nav>
-      <div className="flex-grow p-6">
+      <div className="flex-grow space-y-4 p-6">
+        <div>
+          <CreateBillFormDialog />
+        </div>
         <BillList />
       </div>
     </div>
