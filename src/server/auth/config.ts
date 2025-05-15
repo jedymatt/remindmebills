@@ -2,12 +2,10 @@ import type { BetterAuthOptions } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
 import { nextCookies } from "better-auth/next-js";
 import { env } from "~/env";
-import { db as client } from "~/server/db";
-
-const authDb = client.db("main");
+import { db } from "~/server/db";
 
 export const authConfig = {
-  database: mongodbAdapter(authDb),
+  database: mongodbAdapter(db),
   socialProviders: {
     google: {
       clientId: env.AUTH_GOOGLE_ID,
