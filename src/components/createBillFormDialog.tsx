@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "./ui/select";
 import { Separator } from "./ui/separator";
+import { useState } from "react";
 
 const BaseBillFormValues = z.object({
   title: z.string().min(1, { message: "Title is required" }),
@@ -67,6 +68,7 @@ const CreateBillFormValues = z.discriminatedUnion("type", [
 type CreateBillFormValues = z.infer<typeof CreateBillFormValues>;
 
 export function CreateBillFormDialog() {
+  const [open, setOpen] = useState(false);
   const form = useForm<CreateBillFormValues>({
     resolver: zodResolver(CreateBillFormValues),
     defaultValues: {
@@ -79,6 +81,8 @@ export function CreateBillFormDialog() {
     onSuccess: async () => {
       await utils.bill.getAll.invalidate();
       toast("Bill created successfully.");
+      setOpen(false);
+      form.reset();
     },
   });
 
@@ -89,13 +93,13 @@ export function CreateBillFormDialog() {
   }
 
   return (
-    <Dialog onOpenChange={(open) => !open && form.reset()}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button>
           New Bill <CalendarPlus />
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent onCloseAutoFocus={() => form.reset()}>
         <DialogHeader>
           <DialogTitle>Create New Bill</DialogTitle>
           <DialogDescription>
