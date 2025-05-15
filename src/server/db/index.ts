@@ -19,12 +19,11 @@ const createMongoClient = (): MongoClient => {
 };
 
 const globalForDb = globalThis as unknown as {
-  _mongoClient?: ReturnType<typeof createMongoClient>;
+  _mongoClient?: MongoClient;
 };
 
-export const dbClient = (globalForDb._mongoClient ?? createMongoClient());
+const client = globalForDb._mongoClient ?? createMongoClient();
+if (process.env.NODE_ENV !== "production") globalForDb._mongoClient = client;
 
 // default to database "main"
-export const db = dbClient.db("main");
-
-if (process.env.NODE_ENV !== "production") globalForDb._mongoClient = dbClient;
+export const db = client.db("main");
