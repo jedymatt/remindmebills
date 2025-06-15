@@ -86,7 +86,7 @@ export function BillList() {
   const currentPay = payRule.before(new Date(), true)!;
   const paysUntilFutureMonths = payRule.between(
     currentPay,
-    addMonths(currentPay, 3),
+    addMonths(currentPay, 6),
     true,
   );
 
