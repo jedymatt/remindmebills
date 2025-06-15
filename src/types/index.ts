@@ -7,7 +7,7 @@ export interface Recurrence {
   bymonthday?: number[];
   dtstart?: Date;
   until?: Date;
-  termInMonths?: number;
+  count?: number;
 }
 
 export type Single = {

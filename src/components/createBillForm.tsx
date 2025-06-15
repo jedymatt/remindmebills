@@ -80,7 +80,7 @@ const RecurringBillFormValues = BaseBillFormValues.extend({
     bymonthday: z.array(z.number()).optional(),
     dtstart: z.coerce.date(),
     until: z.coerce.date().optional(),
-    termInMonths: z.coerce.number().optional(),
+    count: z.coerce.number().optional(),
   }),
 });
 
@@ -335,17 +335,17 @@ export function CreateBillForm() {
                         </FormItem>
                       )}
                     />
-                    {/* Term in Months (optional) */}
+                    {/* Term (optional) */}
                     <FormField
                       control={form.control}
-                      name="recurrence.termInMonths"
+                      name="recurrence.count"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Term (optional)</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
-                              placeholder="Term in Months"
+                              placeholder="No. of terms"
                               {...field}
                               value={field.value ?? ""}
                             />

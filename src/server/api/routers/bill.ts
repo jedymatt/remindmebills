@@ -21,7 +21,7 @@ const RecurringBillSchema = BaseBillSchema.extend({
     bymonthday: z.number().array().optional(),
     dtstart: z.date(),
     until: z.date().optional(),
-    termInMonths: z.number().optional(),
+    count: z.number().optional(),
   }),
 });
 
