@@ -114,6 +114,7 @@ export function BillList() {
           dtstart: recurrence.dtstart ?? payDate,
           bymonthday: recurrence.bymonthday,
           until: recurrence.until,
+          count: recurrence.count,
         });
 
         // next pay date
