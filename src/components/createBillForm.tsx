@@ -34,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 
 interface BymonthdayInputProps
   extends Omit<React.ComponentProps<typeof Input>, "onChange"> {
@@ -42,7 +43,6 @@ interface BymonthdayInputProps
 
 function BymonthdayInput({ onChange, value, ...props }: BymonthdayInputProps) {
   const [displayValue, setDisplayValue] = useState(value ?? "");
-
   return (
     <Input
       type="text"
@@ -109,7 +109,7 @@ export function CreateBillForm() {
     },
   });
 
-  const isSingle = form.watch("type") === "single";
+  const formType = form.watch("type");
 
   async function onSubmit(data: CreateBillFormValues) {
     await createBill.mutateAsync(data);
@@ -143,55 +143,36 @@ export function CreateBillForm() {
                 </FormItem>
               )}
             />
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Type</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select bill type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="single">Single</SelectItem>
-                        <SelectItem value="recurring">Recurring</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Amount (optional)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="Amount"
-                        {...field}
-                        value={field.value ?? ""}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            <div className="space-y-4 rounded-md border p-4">
-              <p className="font-semibold">
-                {isSingle ? "Single" : "Recurring"} Bill Details
-              </p>
-              {isSingle && (
+            <FormField
+              control={form.control}
+              name="amount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Amount (optional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      placeholder="Amount"
+                      {...field}
+                      value={field.value ?? ""}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <Tabs
+              value={formType}
+              onValueChange={(value) =>
+                form.setValue("type", value as CreateBillFormValues["type"])
+              }
+            >
+              <TabsList className="w-full">
+                <TabsTrigger value="single">Single Bill</TabsTrigger>
+                <TabsTrigger value="recurring">Recurring Bill</TabsTrigger>
+              </TabsList>
+              <TabsContent value="single" className="space-y-4">
                 <FormField
                   control={form.control}
                   name="date"
@@ -212,92 +193,114 @@ export function CreateBillForm() {
                     </FormItem>
                   )}
                 />
-              )}
-              {!isSingle && (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="recurrence.type"
-                      defaultValue="monthly"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Type</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Select a recurrence type" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="weekly">Weekly</SelectItem>
-                              <SelectItem value="monthly">Monthly</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="recurrence.interval"
-                      defaultValue={1}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Interval</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              placeholder="Interval"
-                              {...field}
-                              value={field.value ?? 1}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+              </TabsContent>
+              <TabsContent value="recurring" className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="recurrence.bymonthday"
+                    name="recurrence.type"
+                    defaultValue="monthly"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>By Month Day (optional)</FormLabel>
-                        <FormControl>
-                          <BymonthdayInput
-                            type="text"
-                            placeholder="1, 15, 31"
-                            {...field}
-                            onChange={field.onChange}
-                            value={field.value?.join(", ") ?? ""}
-                          />
-                        </FormControl>
+                        <FormLabel>Type</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Select a recurrence type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="weekly">Weekly</SelectItem>
+                            <SelectItem value="monthly">Monthly</SelectItem>
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
-                        <FormDescription>
-                          {`[ ${field.value?.join(", ") ?? ""} ]`}
-                          <br />
-                          Enter the days of the month (1-31) when the bill is
-                          due, separated by commas or spaces. For example: 1,
-                          15, 30 or 1 15 30.
-                        </FormDescription>
                       </FormItem>
                     )}
                   />
-                  {/* Date Start */}
                   <FormField
                     control={form.control}
-                    name="recurrence.dtstart"
+                    name="recurrence.interval"
+                    defaultValue={1}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Date Start </FormLabel>
+                        <FormLabel>Interval</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Interval"
+                            {...field}
+                            value={field.value ?? 1}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="recurrence.bymonthday"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>By Month Day (optional)</FormLabel>
+                      <FormControl>
+                        <BymonthdayInput
+                          type="text"
+                          placeholder="1, 15, 31"
+                          {...field}
+                          onChange={field.onChange}
+                          value={field.value?.join(", ") ?? ""}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                      <FormDescription>
+                        {`[ ${field.value?.join(", ") ?? ""} ]`}
+                        <br />
+                        Enter the days of the month (1-31) when the bill is due,
+                        separated by commas or spaces. For example: 1, 15, 30 or
+                        1 15 30.
+                      </FormDescription>
+                    </FormItem>
+                  )}
+                />
+                {/* Date Start */}
+                <FormField
+                  control={form.control}
+                  name="recurrence.dtstart"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date Start </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          placeholder="Date Start"
+                          {...field}
+                          value={
+                            field.value ? format(field.value, "yyyy-MM-dd") : ""
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {/* todo: radio input like bluecoins app */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Until (optional) */}
+                  <FormField
+                    control={form.control}
+                    name="recurrence.until"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Until (optional)</FormLabel>
                         <FormControl>
                           <Input
                             type="date"
-                            placeholder="Date Start"
+                            placeholder="Until"
                             {...field}
                             value={
                               field.value
@@ -310,54 +313,28 @@ export function CreateBillForm() {
                       </FormItem>
                     )}
                   />
-                  {/* todo: radio input like bluecoins app */}
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Until (optional) */}
-                    <FormField
-                      control={form.control}
-                      name="recurrence.until"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Until (optional)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="date"
-                              placeholder="Until"
-                              {...field}
-                              value={
-                                field.value
-                                  ? format(field.value, "yyyy-MM-dd")
-                                  : ""
-                              }
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    {/* Term (optional) */}
-                    <FormField
-                      control={form.control}
-                      name="recurrence.count"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Term (optional)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              placeholder="No. of terms"
-                              {...field}
-                              value={field.value ?? ""}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </>
-              )}
-            </div>
+                  {/* Term (optional) */}
+                  <FormField
+                    control={form.control}
+                    name="recurrence.count"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Term (optional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="No. of terms"
+                            {...field}
+                            value={field.value ?? ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </TabsContent>
+            </Tabs>
           </form>
         </Form>
       </CardContent>
