@@ -1,9 +1,9 @@
 "use client";
 
-import { createAuthClient } from "better-auth/react";
 import { useRouter } from "next/navigation";
 import { useState, type PropsWithChildren } from "react";
 
+import { authClient } from "~/lib/auth-client";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
 import {
@@ -14,8 +14,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-
-const authClient = createAuthClient();
 
 function UserNav() {
   const router = useRouter();

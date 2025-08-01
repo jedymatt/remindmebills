@@ -1,12 +1,10 @@
 "use client";
 
-import { createAuthClient } from "better-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { SVGProps } from "react";
 import { Button } from "~/components/ui/button";
-
-const authClient = createAuthClient();
+import { authClient } from "~/lib/auth-client";
 
 function SimpleIconsGoogle(props: SVGProps<SVGSVGElement>) {
   return (
@@ -58,17 +56,27 @@ export function HomePage() {
           </div>
         </div>
       ) : (
-        <Button
-          onClick={async () => {
-            await authClient.signIn.social({
-              provider: "google",
-              callbackURL: "/dashboard",
-            });
-          }}
-        >
-          Sign in with Google{" "}
-          <SimpleIconsGoogle className="ml-1 inline size-4" />
-        </Button>
+        <div className="flex flex-col space-y-2">
+          <Button
+            onClick={async () => {
+              await authClient.signIn.social({
+                provider: "google",
+                callbackURL: "/dashboard",
+              });
+            }}
+          >
+            Sign in with Google{" "}
+            <SimpleIconsGoogle className="ml-1 inline size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={async () => {
+              await authClient.signIn.anonymous();
+            }}
+          >
+            Sign in as Guest
+          </Button>
+        </div>
       )}
     </main>
   );

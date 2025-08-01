@@ -21,6 +21,9 @@ import { Skeleton } from "~/components/ui/skeleton";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
 import { IncomeProfileSetup } from "../../components/createIncomeProfileForm";
+import { Button } from "~/components/ui/button";
+import Link from "next/link";
+import { CalendarPlus } from "lucide-react";
 
 function getFrequency(freq: "weekly" | "fortnightly" | "monthly") {
   const frequency = {
@@ -40,43 +43,48 @@ export function BillList() {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <Card key={index} className="h-auto">
-            <CardHeader>
-              <CardTitle>
-                <Skeleton className="h-5 w-1/2" />
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 space-y-2">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <div key={index} className="space-y-0.5">
+      <div className="space-y-4 p-6">
+        <Skeleton className="h-9 w-24" />
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <Card key={index} className="h-auto">
+              <CardHeader>
+                <CardTitle>
                   <Skeleton className="h-5 w-1/2" />
-                  <div className="flex justify-between">
-                    <Skeleton className="h-4 w-1/4" />
-                    <Skeleton className="h-4 w-1/4" />
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 space-y-2">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div key={index} className="space-y-0.5">
+                    <Skeleton className="h-5 w-1/2" />
+                    <div className="flex justify-between">
+                      <Skeleton className="h-4 w-1/4" />
+                      <Skeleton className="h-4 w-1/4" />
+                    </div>
                   </div>
-                </div>
-              ))}
-            </CardContent>
-            <CardFooter className="justify-end">
-              <Skeleton className="h-5 w-1/3" />
-            </CardFooter>
-          </Card>
-        ))}
-      </div>
-    );
-  }
-
-  if (!incomeProfile) {
-    return (
-      <div className="flex items-center justify-center">
-        <div className="max-auto w-full max-w-md">
-          <IncomeProfileSetup />
+                ))}
+              </CardContent>
+              <CardFooter className="justify-end">
+                <Skeleton className="h-5 w-1/3" />
+              </CardFooter>
+            </Card>
+          ))}
         </div>
       </div>
     );
   }
+
+  if (!incomeProfile) return null;
+
+  // if (!incomeProfile) {
+  //   return (
+  //     <div className="flex items-center justify-center">
+  //       <div className="max-auto w-full max-w-md">
+  //         <IncomeProfileSetup />
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   const payRule = new RRule({
     dtstart: incomeProfile.startDate,
@@ -144,46 +152,58 @@ export function BillList() {
   });
 
   return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {billsInPayPeriod?.map(({ payDate, bills, after }, index) => (
-        <Card
-          key={index}
-          className={cn(index === 0 && "border-primary border-2")}
-        >
-          {/* // format by date month date, year */}
-          <CardHeader>
-            <CardTitle>
-              {formatDate(payDate, "MMMM dd, yyyy")} -{" "}
-              {after && formatDate(subDays(after, 1), "MMMM dd, yyyy")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 space-y-1">
-            {bills.map((bill) => (
-              <div key={bill._id}>
-                <div className="font-medium">{bill.title}</div>
-                <div className="flex justify-between text-xs">
-                  <div>{bill.date?.toLocaleDateString("en-PH")}</div>
-                  <div>
-                    {bill.amount?.toLocaleString("en-PH", {
-                      style: "currency",
-                      currency: "PHP",
-                    }) ?? (
-                      <span className="text-muted-foreground">Not set</span>
-                    )}
+    <div className="space-y-4 p-6">
+      <div>
+        <Button asChild>
+          <Link href={"/bills/create"}>
+            New Bill <CalendarPlus />
+          </Link>
+        </Button>
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {billsInPayPeriod?.map(({ payDate, bills, after }, index) => (
+          <Card
+            key={index}
+            className={cn(index === 0 && "border-primary border-2")}
+          >
+            {/* // format by date month date, year */}
+            <CardHeader>
+              <CardTitle>
+                {formatDate(payDate, "MMMM dd, yyyy")} -{" "}
+                {after && formatDate(subDays(after, 1), "MMMM dd, yyyy")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 space-y-1">
+              {bills.map((bill) => (
+                <div key={bill._id}>
+                  <div className="font-medium">{bill.title}</div>
+                  <div className="flex justify-between text-xs">
+                    <div>{bill.date?.toLocaleDateString("en-PH")}</div>
+                    <div>
+                      {bill.amount?.toLocaleString("en-PH", {
+                        style: "currency",
+                        currency: "PHP",
+                      }) ?? (
+                        <span className="text-muted-foreground">Not set</span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </CardContent>
-          <CardFooter className="justify-end">
-            ~{" "}
-            {sumBy(bills, (bill) => bill.amount ?? 0).toLocaleString("en-PH", {
-              style: "currency",
-              currency: "PHP",
-            })}
-          </CardFooter>
-        </Card>
-      ))}
+              ))}
+            </CardContent>
+            <CardFooter className="justify-end">
+              ~{" "}
+              {sumBy(bills, (bill) => bill.amount ?? 0).toLocaleString(
+                "en-PH",
+                {
+                  style: "currency",
+                  currency: "PHP",
+                },
+              )}
+            </CardFooter>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }

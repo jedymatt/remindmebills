@@ -1,13 +1,11 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
+import { isFuture, isPast, isToday } from "date-fns";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
-import { Calendar } from "~/components/ui/calendar";
 import {
   Form,
   FormControl,
@@ -18,23 +16,20 @@ import {
   FormMessage,
 } from "~/components/ui/form";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "~/components/ui/popover";
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
+import { DatePicker } from "./datePicker";
 
 const CreateIncomeProfileFormValues = z.object({
   payFrequency: z.enum(["weekly", "fortnightly", "monthly"]),
-  startDate: z.date(),
+  startDate: z.coerce.date().refine((val) => !isFuture(val), {
+    message: "No future dates allowed",
+  }),
 });
 
 type CreateIncomeProfileFormValues = z.infer<
@@ -92,36 +87,7 @@ export function CreateIncomeProfileForm() {
           render={({ field }) => (
             <FormItem className="flex flex-col">
               <FormLabel>Starting Date</FormLabel>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <FormControl>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full pl-3 text-left font-normal",
-                        !field.value && "text-muted-foreground",
-                      )}
-                    >
-                      {field.value ? (
-                        format(field.value, "PPP")
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                    </Button>
-                  </FormControl>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={field.value}
-                    onSelect={field.onChange}
-                    disabled={(date) =>
-                      date > new Date() || date < new Date("1900-01-01")
-                    }
-                  />
-                </PopoverContent>
-              </Popover>
+              <DatePicker value={field.value} onChange={field.onChange} />
               <FormDescription>Initial received pay date.</FormDescription>
               <FormMessage />
             </FormItem>
