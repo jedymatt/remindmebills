@@ -76,16 +76,6 @@ export function BillList() {
 
   if (!incomeProfile) return null;
 
-  // if (!incomeProfile) {
-  //   return (
-  //     <div className="flex items-center justify-center">
-  //       <div className="max-auto w-full max-w-md">
-  //         <IncomeProfileSetup />
-  //       </div>
-  //     </div>
-  //   );
-  // }
-
   const payRule = new RRule({
     dtstart: incomeProfile.startDate,
     ...getFrequency(incomeProfile.payFrequency),

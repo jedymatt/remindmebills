@@ -119,8 +119,6 @@ export function CreateBillForm() {
   const formType = form.watch("type");
 
   async function handleSubmit(data: CreateBillFormValues) {
-    console.log("Form submitted with data:", data);
-    return;
     await createBill.mutateAsync(data);
   }
 
@@ -136,9 +134,7 @@ export function CreateBillForm() {
         <Form {...form}>
           <form
             id="create-bill-form"
-            onSubmit={form.handleSubmit(handleSubmit, (error) =>
-              console.error(error),
-            )}
+            onSubmit={form.handleSubmit(handleSubmit)}
             className="space-y-4"
           >
             <FormField
