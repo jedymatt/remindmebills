@@ -83,7 +83,7 @@ const RecurringBillFormValues = BaseBillFormValues.extend({
     bymonthday: z.array(z.number()).optional(),
     dtstart: z.coerce.date(),
     until: z.coerce.date().optional(),
-    count: z.coerce.number().optional(),
+    count: z.coerce.number().min(1).optional(),
   }),
 });
 
@@ -251,7 +251,6 @@ export function CreateBillForm() {
                           type="number"
                           placeholder="Interval"
                           {...field}
-                          min={1}
                         />
                       </FormControl>
                       <FormMessage />
