@@ -9,7 +9,10 @@ import {
   subDays,
 } from "date-fns";
 import { sumBy } from "lodash";
+import { CalendarPlus } from "lucide-react";
+import Link from "next/link";
 import { RRule } from "rrule";
+import { Button } from "~/components/ui/button";
 import {
   Card,
   CardContent,
@@ -20,10 +23,6 @@ import {
 import { Skeleton } from "~/components/ui/skeleton";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
-import { IncomeProfileSetup } from "../../components/createIncomeProfileForm";
-import { Button } from "~/components/ui/button";
-import Link from "next/link";
-import { CalendarPlus } from "lucide-react";
 
 function getFrequency(freq: "weekly" | "fortnightly" | "monthly") {
   const frequency = {

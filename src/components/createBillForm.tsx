@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useController, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { api } from "~/trpc/react";
@@ -20,13 +20,14 @@ import {
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "./ui/form";
 import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -34,36 +35,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Separator } from "./ui/separator";
-import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
-import { Label } from "./ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 
-interface BymonthdayInputProps
-  extends Omit<React.ComponentProps<typeof Input>, "onChange"> {
-  onChange?: (values: number[]) => void;
-}
+// TODO: Think of a better way to place this component
+// interface BymonthdayInputProps
+//   extends Omit<React.ComponentProps<typeof Input>, "onChange"> {
+//   onChange?: (values: number[]) => void;
+// }
 
-function BymonthdayInput({ onChange, value, ...props }: BymonthdayInputProps) {
-  const [displayValue, setDisplayValue] = useState(value ?? "");
-  return (
-    <Input
-      type="text"
-      onChange={(e) => {
-        setDisplayValue(e.currentTarget.value);
-        const value = e.currentTarget.value
-          .trim()
-          .split(/[,\s*]/)
-          .filter((v) => v.length > 0)
-          .map((v) => Number(v));
+// function BymonthdayInput({ onChange, value, ...props }: BymonthdayInputProps) {
+//   const [displayValue, setDisplayValue] = useState(value ?? "");
+//   return (
+//     <Input
+//       type="text"
+//       onChange={(e) => {
+//         setDisplayValue(e.currentTarget.value);
+//         const value = e.currentTarget.value
+//           .trim()
+//           .split(/[,\s*]/)
+//           .filter((v) => v.length > 0)
+//           .map((v) => Number(v));
 
-        onChange?.(value);
-      }}
-      value={displayValue}
-      {...props}
-    />
-  );
-}
+//         onChange?.(value);
+//       }}
+//       value={displayValue}
+//       {...props}
+//     />
+//   );
+// }
 
 const BaseBillFormValues = z.object({
   title: z.string().min(1, { message: "Title is required" }),
@@ -116,7 +116,10 @@ export function CreateBillForm() {
     "never" | "until" | "count" | ({} & string)
   >("never");
 
-  const formType = form.watch("type");
+  const [formType, formRecurrenceType] = form.watch([
+    "type",
+    "recurrence.type",
+  ]);
 
   async function handleSubmit(data: CreateBillFormValues) {
     await createBill.mutateAsync(data);
@@ -228,6 +231,33 @@ export function CreateBillForm() {
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="recurrence.interval"
+                  defaultValue={1}
+                  rules={{
+                    min: 1,
+                  }}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Repeats every {Number(field.value) ?? 1}{" "}
+                        {formRecurrenceType === "weekly"
+                          ? "week" + (Number(field.value) !== 1 ? "s" : "")
+                          : "month" + (Number(field.value) !== 1 ? "s" : "")}
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Interval"
+                          {...field}
+                          min={1}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 {/* Date Start */}
                 <FormField
                   control={form.control}
@@ -270,7 +300,11 @@ export function CreateBillForm() {
                       disabled={recurringEndsWith !== "count"}
                       render={({ field }) => (
                         <FormItem className="pt-0.5">
-                          <FormLabel>After</FormLabel>
+                          <FormLabel
+                            onClick={() => setRecurringEndsWith("count")}
+                          >
+                            After
+                          </FormLabel>
                           <FormControl>
                             <Input
                               type="number"
@@ -292,7 +326,11 @@ export function CreateBillForm() {
                       disabled={recurringEndsWith !== "until"}
                       render={({ field }) => (
                         <FormItem className="pt-0.5">
-                          <FormLabel>Until</FormLabel>
+                          <FormLabel
+                            onClick={() => setRecurringEndsWith("until")}
+                          >
+                            Until
+                          </FormLabel>
                           <FormControl>
                             <Input
                               type="date"
