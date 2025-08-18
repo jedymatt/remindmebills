@@ -9,8 +9,9 @@ import {
   subDays,
 } from "date-fns";
 import { sumBy } from "lodash";
-import { CalendarPlus } from "lucide-react";
+import { CalendarPlus, EyeIcon, EyeOffIcon } from "lucide-react";
 import Link from "next/link";
+import { useMemo, useState } from "react";
 import { RRule } from "rrule";
 import { Button } from "~/components/ui/button";
 import {
@@ -23,6 +24,7 @@ import {
 import { Skeleton } from "~/components/ui/skeleton";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
+import type { BillEvent } from "~/types";
 
 function getFrequency(freq: "weekly" | "fortnightly" | "monthly") {
   const frequency = {
@@ -31,6 +33,96 @@ function getFrequency(freq: "weekly" | "fortnightly" | "monthly") {
     monthly: { freq: RRule.MONTHLY },
   };
   return frequency[freq];
+}
+
+function BillListCard({
+  bills,
+  payDate,
+  after,
+  isCurrent,
+}: {
+  bills: (BillEvent & { date: Date })[]; // TODO: & {date: Date} is a temporary fix
+  payDate: Date;
+  after: Date | null;
+  isCurrent: boolean;
+}) {
+  const [excludedBills, setExcludedBills] = useState<string[]>([]);
+
+  const totalAmount = useMemo(() => {
+    return sumBy(
+      bills.filter((bill) => !excludedBills.includes(bill._id)),
+      (bill) => bill.amount ?? 0,
+    );
+  }, [bills, excludedBills]);
+
+  return (
+    <Card className={cn(isCurrent && "border-primary border-2")}>
+      {/* // format by date month date, year */}
+      <CardHeader>
+        <CardTitle>
+          {formatDate(payDate, "MMMM dd, yyyy")} -{" "}
+          {after && formatDate(subDays(after, 1), "MMMM dd, yyyy")}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex-1 space-y-1">
+        {bills.map((bill) => (
+          <div key={bill._id} className="flex gap-2">
+            <div className="mt-0.5 size-5">
+              {excludedBills.includes(bill._id) ? (
+                <EyeOffIcon
+                  className="size-5 text-primary/50"
+                  onClick={() => {
+                    setExcludedBills((prev) => {
+                      return prev.filter((id) => id !== bill._id);
+                    });
+                  }}
+                />
+              ) : (
+                <EyeIcon
+                  className="size-5"
+                  onClick={() => {
+                    setExcludedBills((prev) => {
+                      return [...prev, bill._id];
+                    });
+                  }}
+                />
+              )}
+            </div>
+            <div className={cn("w-full")}>
+              <div
+                className={cn(
+                  "font-medium",
+                  excludedBills.includes(bill._id) && "text-sm text-primary/50",
+                )}
+              >
+                {bill.title}
+              </div>
+              {!excludedBills.includes(bill._id) && (
+                <div className="flex justify-between text-xs">
+                  <div>{bill.date?.toLocaleDateString("en-PH")}</div>
+                  <div>
+                    {bill.amount?.toLocaleString("en-PH", {
+                      style: "currency",
+                      currency: "PHP",
+                    }) ?? (
+                      <span className="text-muted-foreground">Not set</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </CardContent>
+      <CardFooter className="justify-end">
+        ~{" "}
+        {totalAmount.toLocaleString("en-PH", {
+          style: "currency",
+          currency: "PHP",
+        })}
+      </CardFooter>
+    </Card>
+  );
 }
 
 export function BillList() {
@@ -151,46 +243,13 @@ export function BillList() {
       </div>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {billsInPayPeriod?.map(({ payDate, bills, after }, index) => (
-          <Card
+          <BillListCard
             key={index}
-            className={cn(index === 0 && "border-primary border-2")}
-          >
-            {/* // format by date month date, year */}
-            <CardHeader>
-              <CardTitle>
-                {formatDate(payDate, "MMMM dd, yyyy")} -{" "}
-                {after && formatDate(subDays(after, 1), "MMMM dd, yyyy")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 space-y-1">
-              {bills.map((bill) => (
-                <div key={bill._id}>
-                  <div className="font-medium">{bill.title}</div>
-                  <div className="flex justify-between text-xs">
-                    <div>{bill.date?.toLocaleDateString("en-PH")}</div>
-                    <div>
-                      {bill.amount?.toLocaleString("en-PH", {
-                        style: "currency",
-                        currency: "PHP",
-                      }) ?? (
-                        <span className="text-muted-foreground">Not set</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-            <CardFooter className="justify-end">
-              ~{" "}
-              {sumBy(bills, (bill) => bill.amount ?? 0).toLocaleString(
-                "en-PH",
-                {
-                  style: "currency",
-                  currency: "PHP",
-                },
-              )}
-            </CardFooter>
-          </Card>
+            payDate={payDate}
+            bills={bills}
+            after={after}
+            isCurrent={index === 0}
+          />
         ))}
       </div>
     </div>
