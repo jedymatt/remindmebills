@@ -35,6 +35,30 @@ function getFrequency(freq: "weekly" | "fortnightly" | "monthly") {
   return frequency[freq];
 }
 
+function BillItemVisibilityToggle({
+  isVisible,
+  onToggle,
+}: {
+  isVisible: boolean;
+  onToggle: (isVisible: boolean) => void;
+}) {
+  return isVisible ? (
+    <EyeOffIcon
+      className="text-primary/50 size-5"
+      onClick={() => {
+        onToggle(false);
+      }}
+    />
+  ) : (
+    <EyeIcon
+      className="size-5"
+      onClick={() => {
+        onToggle(true);
+      }}
+    />
+  );
+}
+
 function BillListCard({
   bills,
   payDate,
@@ -66,33 +90,30 @@ function BillListCard({
       </CardHeader>
       <CardContent className="flex-1 space-y-1">
         {bills.map((bill) => (
-          <div key={bill._id} className="flex gap-2">
+          <div
+            key={bill._id}
+            className={cn(
+              "flex gap-2",
+              isEqual(bill.date, payDate) && "text-yellow-700",
+            )}
+          >
             <div className="mt-0.5 size-5">
-              {excludedBills.includes(bill._id) ? (
-                <EyeOffIcon
-                  className="size-5 text-primary/50"
-                  onClick={() => {
-                    setExcludedBills((prev) => {
-                      return prev.filter((id) => id !== bill._id);
-                    });
-                  }}
-                />
-              ) : (
-                <EyeIcon
-                  className="size-5"
-                  onClick={() => {
-                    setExcludedBills((prev) => {
-                      return [...prev, bill._id];
-                    });
-                  }}
-                />
-              )}
+              <BillItemVisibilityToggle
+                isVisible={excludedBills.includes(bill._id)}
+                onToggle={(isVisible) => {
+                  setExcludedBills((prev) => {
+                    return isVisible
+                      ? [...prev, bill._id]
+                      : prev.filter((id) => id !== bill._id);
+                  });
+                }}
+              />
             </div>
             <div className={cn("w-full")}>
               <div
                 className={cn(
                   "font-medium",
-                  excludedBills.includes(bill._id) && "text-sm text-primary/50",
+                  excludedBills.includes(bill._id) && "text-primary/50 text-sm",
                 )}
               >
                 {bill.title}
