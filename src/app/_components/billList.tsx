@@ -9,7 +9,7 @@ import {
   subDays,
 } from "date-fns";
 import { sumBy } from "lodash";
-import { CalendarPlus, EyeIcon, EyeOffIcon } from "lucide-react";
+import { CalendarPlus, EyeClosedIcon, EyeIcon } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { RRule } from "rrule";
@@ -43,7 +43,7 @@ function BillItemVisibilityToggle({
   onToggle: (isVisible: boolean) => void;
 }) {
   return isVisible ? (
-    <EyeOffIcon
+    <EyeClosedIcon
       className="text-primary/50 size-5"
       onClick={() => {
         onToggle(false);
