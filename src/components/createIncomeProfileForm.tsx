@@ -37,6 +37,7 @@ type CreateIncomeProfileFormValues = z.infer<
 >;
 
 export function CreateIncomeProfileForm() {
+  // TODO: Add amount field later
   const form = useForm<CreateIncomeProfileFormValues>({
     resolver: zodResolver(CreateIncomeProfileFormValues),
   });
