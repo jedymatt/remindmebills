@@ -22,6 +22,7 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import { Skeleton } from "~/components/ui/skeleton";
+import { authClient } from "~/lib/auth-client";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
 import type { BillEvent } from "~/types";
@@ -42,6 +43,7 @@ function BillItemVisibilityToggle({
   isVisible: boolean;
   onToggle: (isVisible: boolean) => void;
 }) {
+  // TODO: change icons to either subtract ingoing or outgoing 
   return isVisible ? (
     <EyeClosedIcon
       className="text-primary/50 size-5"
@@ -64,20 +66,27 @@ function BillListCard({
   payDate,
   after,
   isCurrent,
+  ingoing,
 }: {
   bills: (BillEvent & { date: Date })[]; // TODO: & {date: Date} is a temporary fix
   payDate: Date;
   after: Date | null;
   isCurrent: boolean;
+  ingoing: number;
 }) {
   const [excludedBills, setExcludedBills] = useState<string[]>([]);
+  const [showBreakdown, setShowBreakdown] = useState(false);
 
-  const totalAmount = useMemo(() => {
-    return sumBy(
-      bills.filter((bill) => !excludedBills.includes(bill._id)),
-      (bill) => bill.amount ?? 0,
-    );
-  }, [bills, excludedBills]);
+  const outgoing = useMemo(
+    () =>
+      -sumBy(
+        bills.filter((bill) => !excludedBills.includes(bill._id)),
+        (bill) => bill.amount ?? 0,
+      ),
+    [bills, excludedBills],
+  );
+
+  const computedTotal = useMemo(() => ingoing + outgoing, [ingoing, outgoing]);
 
   return (
     <Card className={cn(isCurrent && "border-primary border-2")}>
@@ -135,12 +144,35 @@ function BillListCard({
           </div>
         ))}
       </CardContent>
-      <CardFooter className="justify-end">
-        ~{" "}
-        {totalAmount.toLocaleString("en-PH", {
-          style: "currency",
-          currency: "PHP",
-        })}
+      <CardFooter className="flex-col items-end justify-end">
+        <Button
+          variant="ghost"
+          onClick={() => setShowBreakdown((prev) => !prev)}
+        >
+          {computedTotal.toLocaleString("en-PH", {
+            style: "currency",
+            currency: "PHP",
+            signDisplay: "always",
+          })}
+        </Button>
+        {showBreakdown && (
+          <div className="flex flex-col place-items-end justify-end px-4 text-sm">
+            <span>
+              {ingoing.toLocaleString("en-PH", {
+                style: "currency",
+                currency: "PHP",
+                signDisplay: "always",
+              })}
+            </span>
+            <span>
+              {outgoing.toLocaleString("en-PH", {
+                style: "currency",
+                currency: "PHP",
+                signDisplay: "always",
+              })}
+            </span>
+          </div>
+        )}
       </CardFooter>
     </Card>
   );
@@ -150,8 +182,11 @@ export function BillList() {
   const { data: bills, isLoading: isBillLoading } = api.bill.getAll.useQuery();
   const { data: incomeProfile, isLoading: isIncomeProfileLoading } =
     api.income.getIncomeProfile.useQuery();
+  // get user
+  const { data: session } = authClient.useSession();
+  const user = session?.user;
 
-  const isLoading = isBillLoading || isIncomeProfileLoading;
+  const isLoading = isBillLoading || isIncomeProfileLoading || !user;
 
   if (isLoading) {
     return (
@@ -253,6 +288,8 @@ export function BillList() {
     };
   });
 
+  const ingoing = incomeProfile.amount ?? 0;
+
   return (
     <div className="space-y-4 p-6">
       <div>
@@ -270,6 +307,7 @@ export function BillList() {
             bills={bills}
             after={after}
             isCurrent={index === 0}
+            ingoing={ingoing}
           />
         ))}
       </div>

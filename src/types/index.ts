@@ -30,4 +30,5 @@ export type BillEvent = {
 export interface IncomeProfile {
   payFrequency: "weekly" | "fortnightly" | "monthly";
   startDate: Date;
+  amount?: number;
 }
