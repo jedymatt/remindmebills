@@ -20,12 +20,23 @@ export type Recurring = {
   recurrence: Recurrence;
 };
 
+export type SPayLater = {
+  type: "spaylater";
+  spaylater: {
+    principalAmount: number;
+    installmentMonths: 3 | 6 | 12;
+    interestRate: number; // percentage (e.g., 0 for 0%, 1.5 for 1.5%)
+    monthlyPayment: number; // calculated amount
+    dtstart: Date;
+  };
+};
+
 export type BillEvent = {
   _id: string;
   title: string;
   amount?: number;
   userId: ObjectId;
-} & (Single | Recurring);
+} & (Single | Recurring | SPayLater);
 
 export interface IncomeProfile {
   payFrequency: "weekly" | "fortnightly" | "monthly";

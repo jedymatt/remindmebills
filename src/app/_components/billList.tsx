@@ -249,33 +249,66 @@ export function BillList() {
           return [];
         }
 
-        const { recurrence } = bill;
+        if (bill.type === "recurring") {
+          const { recurrence } = bill;
 
-        const billRule = new RRule({
-          ...getFrequency(recurrence.type),
-          interval: recurrence.interval,
-          // need to pass payDate as fallback so it will capture the periods after that date
-          // in the future, fallback won't be needed as we can just override the event when we can create bills.
-          dtstart: recurrence.dtstart ?? payDate,
-          bymonthday: recurrence.bymonthday,
-          until: recurrence.until,
-          count: recurrence.count,
-        });
+          const billRule = new RRule({
+            ...getFrequency(recurrence.type),
+            interval: recurrence.interval,
+            // need to pass payDate as fallback so it will capture the periods after that date
+            // in the future, fallback won't be needed as we can just override the event when we can create bills.
+            dtstart: recurrence.dtstart ?? payDate,
+            bymonthday: recurrence.bymonthday,
+            until: recurrence.until,
+            count: recurrence.count,
+          });
 
-        // next pay date
-        const nextPayDate = payRule.after(payDate)!;
-        const billDates = billRule
-          .between(payDate, nextPayDate, true)
-          .filter(
-            (date) =>
-              (isAfter(date, payDate) || isEqual(date, payDate)) &&
-              isBefore(date, nextPayDate),
-          );
+          // next pay date
+          const nextPayDate = payRule.after(payDate)!;
+          const billDates = billRule
+            .between(payDate, nextPayDate, true)
+            .filter(
+              (date) =>
+                (isAfter(date, payDate) || isEqual(date, payDate)) &&
+                isBefore(date, nextPayDate),
+            );
 
-        return billDates.map((date) => ({
-          ...bill,
-          date,
-        }));
+          return billDates.map((date) => ({
+            ...bill,
+            date,
+          }));
+        }
+
+        if (bill.type === "spaylater") {
+          const { spaylater } = bill;
+
+          // Create a monthly recurring rule for SPayLater installments
+          const billRule = new RRule({
+            freq: RRule.MONTHLY,
+            interval: 1,
+            dtstart: spaylater.dtstart,
+            count: spaylater.installmentMonths,
+          });
+
+          // next pay date
+          const nextPayDate = payRule.after(payDate)!;
+          const billDates = billRule
+            .between(payDate, nextPayDate, true)
+            .filter(
+              (date) =>
+                (isAfter(date, payDate) || isEqual(date, payDate)) &&
+                isBefore(date, nextPayDate),
+            );
+
+          return billDates.map((date) => ({
+            ...bill,
+            // Override amount with the monthly payment for display
+            amount: spaylater.monthlyPayment,
+            date,
+          }));
+        }
+
+        return [];
       })
       .flat()
       .filter((bill) => bill !== null)

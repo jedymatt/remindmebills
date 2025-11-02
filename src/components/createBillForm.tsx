@@ -87,9 +87,21 @@ const RecurringBillFormValues = BaseBillFormValues.extend({
   }),
 });
 
+const SPayLaterBillFormValues = BaseBillFormValues.extend({
+  type: z.literal("spaylater"),
+  spaylater: z.object({
+    principalAmount: z.coerce.number().min(0, { message: "Principal amount must be positive" }),
+    installmentMonths: z.enum(["3", "6", "12"]),
+    interestRate: z.coerce.number().min(0).max(100),
+    monthlyPayment: z.coerce.number().min(0),
+    dtstart: z.coerce.date(),
+  }),
+});
+
 const CreateBillFormValues = z.discriminatedUnion("type", [
   SingleBillFormValues,
   RecurringBillFormValues,
+  SPayLaterBillFormValues,
 ]);
 
 type CreateBillFormValues = z.infer<typeof CreateBillFormValues>;
@@ -179,9 +191,10 @@ export function CreateBillForm() {
                 form.setValue("type", value as CreateBillFormValues["type"])
               }
             >
-              <TabsList className="w-full">
+              <TabsList className="w-full grid grid-cols-3">
                 <TabsTrigger value="single">Once</TabsTrigger>
                 <TabsTrigger value="recurring">Repeating</TabsTrigger>
+                <TabsTrigger value="spaylater">SPayLater</TabsTrigger>
               </TabsList>
               <TabsContent value="single" className="space-y-4">
                 <FormField
@@ -375,6 +388,138 @@ export function CreateBillForm() {
                     </FormItem>
                   )}
                 /> */}
+              </TabsContent>
+              <TabsContent value="spaylater" className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="spaylater.principalAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Purchase Amount</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Enter purchase amount"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            // Recalculate monthly payment when principal changes
+                            const principal = parseFloat(e.target.value) || 0;
+                            const months = parseInt(form.getValues("spaylater.installmentMonths") || "3");
+                            const rate = parseFloat(String(form.getValues("spaylater.interestRate"))) || 0;
+                            const totalAmount = principal * (1 + rate / 100);
+                            const monthly = totalAmount / months;
+                            form.setValue("spaylater.monthlyPayment", monthly);
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="spaylater.installmentMonths"
+                  defaultValue="3"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Installment Period</FormLabel>
+                      <Select
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          // Recalculate monthly payment when months change
+                          const principal = parseFloat(String(form.getValues("spaylater.principalAmount"))) || 0;
+                          const months = parseInt(value);
+                          const rate = parseFloat(String(form.getValues("spaylater.interestRate"))) || 0;
+                          const totalAmount = principal * (1 + rate / 100);
+                          const monthly = totalAmount / months;
+                          form.setValue("spaylater.monthlyPayment", monthly);
+                        }}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="3">3 Months</SelectItem>
+                          <SelectItem value="6">6 Months</SelectItem>
+                          <SelectItem value="12">12 Months</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="spaylater.interestRate"
+                  defaultValue={0}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Interest Rate (%)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          placeholder="Enter interest rate"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            // Recalculate monthly payment when rate changes
+                            const principal = parseFloat(String(form.getValues("spaylater.principalAmount"))) || 0;
+                            const months = parseInt(form.getValues("spaylater.installmentMonths") || "3");
+                            const rate = parseFloat(e.target.value) || 0;
+                            const totalAmount = principal * (1 + rate / 100);
+                            const monthly = totalAmount / months;
+                            form.setValue("spaylater.monthlyPayment", monthly);
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="spaylater.monthlyPayment"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Monthly Payment (Auto-calculated)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Monthly payment"
+                          {...field}
+                          value={field.value?.toFixed(2) ?? ""}
+                          disabled
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="spaylater.dtstart"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First Payment Date</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          placeholder="First payment date"
+                          {...field}
+                          value={
+                            field.value ? format(field.value, "yyyy-MM-dd") : ""
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </TabsContent>
             </Tabs>
           </form>

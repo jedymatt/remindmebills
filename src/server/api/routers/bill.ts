@@ -25,9 +25,21 @@ const RecurringBillSchema = BaseBillSchema.extend({
   }),
 });
 
+const SPayLaterBillSchema = BaseBillSchema.extend({
+  type: z.literal("spaylater"),
+  spaylater: z.object({
+    principalAmount: z.number().min(0),
+    installmentMonths: z.enum(["3", "6", "12"]).transform((val) => parseInt(val) as 3 | 6 | 12),
+    interestRate: z.number().min(0).max(100),
+    monthlyPayment: z.number().min(0),
+    dtstart: z.date(),
+  }),
+});
+
 const InputBillSchema = z.discriminatedUnion("type", [
   SingleBillSchema,
   RecurringBillSchema,
+  SPayLaterBillSchema,
 ]);
 
 export const billRouter = createTRPCRouter({
