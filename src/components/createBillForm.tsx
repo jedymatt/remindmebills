@@ -128,6 +128,16 @@ export function CreateBillForm() {
     "never" | "until" | "count" | ({} & string)
   >("never");
 
+  // Helper function to calculate SPayLater monthly payment
+  const calculateMonthlyPayment = () => {
+    const principal = parseFloat(String(form.getValues("spaylater.principalAmount"))) || 0;
+    const months = parseInt(form.getValues("spaylater.installmentMonths") || "3");
+    const rate = parseFloat(String(form.getValues("spaylater.interestRate"))) || 0;
+    const totalAmount = principal * (1 + rate / 100);
+    const monthly = totalAmount / months;
+    form.setValue("spaylater.monthlyPayment", monthly);
+  };
+
   const [formType, formRecurrenceType] = form.watch([
     "type",
     "recurrence.type",
@@ -403,13 +413,7 @@ export function CreateBillForm() {
                           {...field}
                           onChange={(e) => {
                             field.onChange(e);
-                            // Recalculate monthly payment when principal changes
-                            const principal = parseFloat(e.target.value) || 0;
-                            const months = parseInt(form.getValues("spaylater.installmentMonths") || "3");
-                            const rate = parseFloat(String(form.getValues("spaylater.interestRate"))) || 0;
-                            const totalAmount = principal * (1 + rate / 100);
-                            const monthly = totalAmount / months;
-                            form.setValue("spaylater.monthlyPayment", monthly);
+                            calculateMonthlyPayment();
                           }}
                         />
                       </FormControl>
@@ -427,13 +431,7 @@ export function CreateBillForm() {
                       <Select
                         onValueChange={(value) => {
                           field.onChange(value);
-                          // Recalculate monthly payment when months change
-                          const principal = parseFloat(String(form.getValues("spaylater.principalAmount"))) || 0;
-                          const months = parseInt(value);
-                          const rate = parseFloat(String(form.getValues("spaylater.interestRate"))) || 0;
-                          const totalAmount = principal * (1 + rate / 100);
-                          const monthly = totalAmount / months;
-                          form.setValue("spaylater.monthlyPayment", monthly);
+                          calculateMonthlyPayment();
                         }}
                         defaultValue={field.value}
                       >
@@ -467,13 +465,7 @@ export function CreateBillForm() {
                           {...field}
                           onChange={(e) => {
                             field.onChange(e);
-                            // Recalculate monthly payment when rate changes
-                            const principal = parseFloat(String(form.getValues("spaylater.principalAmount"))) || 0;
-                            const months = parseInt(form.getValues("spaylater.installmentMonths") || "3");
-                            const rate = parseFloat(e.target.value) || 0;
-                            const totalAmount = principal * (1 + rate / 100);
-                            const monthly = totalAmount / months;
-                            form.setValue("spaylater.monthlyPayment", monthly);
+                            calculateMonthlyPayment();
                           }}
                         />
                       </FormControl>
