@@ -91,7 +91,7 @@ const SPayLaterBillFormValues = BaseBillFormValues.extend({
   type: z.literal("spaylater"),
   spaylater: z.object({
     principalAmount: z.coerce.number().min(0, { message: "Principal amount must be positive" }),
-    installmentMonths: z.enum(["3", "6", "12"]),
+    installmentMonths: z.union([z.literal(3), z.literal(6), z.literal(12)]),
     interestRate: z.coerce.number().min(0).max(100),
     monthlyPayment: z.coerce.number().min(0),
     dtstart: z.coerce.date(),
@@ -131,7 +131,7 @@ export function CreateBillForm() {
   // Helper function to calculate SPayLater monthly payment
   const calculateMonthlyPayment = () => {
     const principal = parseFloat(String(form.getValues("spaylater.principalAmount"))) || 0;
-    const months = parseInt(form.getValues("spaylater.installmentMonths") || "3");
+    const months = form.getValues("spaylater.installmentMonths") || 3;
     const rate = parseFloat(String(form.getValues("spaylater.interestRate"))) || 0;
     const totalAmount = principal * (1 + rate / 100);
     const monthly = totalAmount / months;
@@ -424,16 +424,17 @@ export function CreateBillForm() {
                 <FormField
                   control={form.control}
                   name="spaylater.installmentMonths"
-                  defaultValue="3"
+                  defaultValue={3}
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Installment Period</FormLabel>
                       <Select
                         onValueChange={(value) => {
-                          field.onChange(value);
+                          field.onChange(parseInt(value));
                           calculateMonthlyPayment();
                         }}
-                        defaultValue={field.value}
+                        defaultValue={String(field.value)}
+                        value={String(field.value)}
                       >
                         <FormControl>
                           <SelectTrigger className="w-full">

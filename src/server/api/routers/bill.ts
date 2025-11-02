@@ -29,7 +29,7 @@ const SPayLaterBillSchema = BaseBillSchema.extend({
   type: z.literal("spaylater"),
   spaylater: z.object({
     principalAmount: z.number().min(0),
-    installmentMonths: z.enum(["3", "6", "12"]).transform((val) => parseInt(val) as 3 | 6 | 12),
+    installmentMonths: z.union([z.literal(3), z.literal(6), z.literal(12)]),
     interestRate: z.number().min(0).max(100),
     monthlyPayment: z.number().min(0),
     dtstart: z.date(),

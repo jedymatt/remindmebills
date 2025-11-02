@@ -22,6 +22,7 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import { Skeleton } from "~/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { authClient } from "~/lib/auth-client";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
@@ -223,6 +224,10 @@ export function BillList() {
 
   if (!incomeProfile) return null;
 
+  // Separate regular bills and SPayLater bills
+  const regularBills = bills?.filter((bill) => bill.type !== "spaylater") ?? [];
+  const spaylaterBills = bills?.filter((bill) => bill.type === "spaylater") ?? [];
+
   const payRule = new RRule({
     dtstart: incomeProfile.startDate,
     ...getFrequency(incomeProfile.payFrequency),
@@ -235,8 +240,9 @@ export function BillList() {
     true,
   );
 
-  const billsInPayPeriod = paysUntilFutureMonths.map((payDate) => {
-    const currentBills = bills
+  // Process regular bills
+  const regularBillsInPayPeriod = paysUntilFutureMonths.map((payDate) => {
+    const currentBills = regularBills
       ?.map((bill) => {
         if (bill.type === "single") {
           if (
@@ -279,6 +285,23 @@ export function BillList() {
           }));
         }
 
+        return [];
+      })
+      .flat()
+      .filter((bill) => bill !== null)
+      .sort((a, b) => (isAfter(a.date, b.date) ? 1 : -1));
+
+    return {
+      payDate,
+      bills: currentBills ?? [],
+      after: payRule.after(payDate),
+    };
+  });
+
+  // Process SPayLater bills
+  const spaylaterBillsInPayPeriod = paysUntilFutureMonths.map((payDate) => {
+    const currentBills = spaylaterBills
+      ?.map((bill) => {
         if (bill.type === "spaylater") {
           const { spaylater } = bill;
 
@@ -332,18 +355,57 @@ export function BillList() {
           </Link>
         </Button>
       </div>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {billsInPayPeriod?.map(({ payDate, bills, after }, index) => (
-          <BillListCard
-            key={index}
-            payDate={payDate}
-            bills={bills}
-            after={after}
-            isCurrent={index === 0}
-            ingoing={ingoing}
-          />
-        ))}
-      </div>
+      <Tabs defaultValue="all" className="w-full">
+        <TabsList>
+          <TabsTrigger value="all">All Bills</TabsTrigger>
+          <TabsTrigger value="regular">Regular Bills</TabsTrigger>
+          <TabsTrigger value="spaylater">SPayLater</TabsTrigger>
+        </TabsList>
+        <TabsContent value="all" className="mt-4">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {[...regularBillsInPayPeriod, ...spaylaterBillsInPayPeriod]
+              .sort((a, b) => (isAfter(a.payDate, b.payDate) ? 1 : -1))
+              .map(({ payDate, bills, after }, index) => (
+                <BillListCard
+                  key={index}
+                  payDate={payDate}
+                  bills={bills}
+                  after={after}
+                  isCurrent={index === 0}
+                  ingoing={ingoing}
+                />
+              ))}
+          </div>
+        </TabsContent>
+        <TabsContent value="regular" className="mt-4">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {regularBillsInPayPeriod?.map(({ payDate, bills, after }, index) => (
+              <BillListCard
+                key={index}
+                payDate={payDate}
+                bills={bills}
+                after={after}
+                isCurrent={index === 0}
+                ingoing={ingoing}
+              />
+            ))}
+          </div>
+        </TabsContent>
+        <TabsContent value="spaylater" className="mt-4">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {spaylaterBillsInPayPeriod?.map(({ payDate, bills, after }, index) => (
+              <BillListCard
+                key={index}
+                payDate={payDate}
+                bills={bills}
+                after={after}
+                isCurrent={index === 0}
+                ingoing={ingoing}
+              />
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
