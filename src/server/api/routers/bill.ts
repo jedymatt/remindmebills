@@ -4,7 +4,7 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { z } from "zod";
 
 const BaseBillSchema = z.object({
-  title: z.string().min(1, { message: "Title is required" }),
+  title: z.string().trim().min(1, { message: "Title is required" }),
   amount: z.number().min(0).optional(),
 });
 
