@@ -1,7 +1,7 @@
 import { ObjectId } from "mongodb";
 import type { BillEvent } from "~/types";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { z } from "zod";
+import { z } from "zod/v3";
 
 const BaseBillSchema = z.object({
   title: z.string().trim().min(1, { message: "Title is required" }),
