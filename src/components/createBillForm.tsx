@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { api } from "~/trpc/react";
@@ -116,10 +116,10 @@ export function CreateBillForm() {
     "never" | "until" | "count" | ({} & string)
   >("never");
 
-  const [formType, formRecurrenceType] = form.watch([
-    "type",
-    "recurrence.type",
-  ]);
+  const [formType, formRecurrenceType] = useWatch({
+    name: ["type", "recurrence.type"],
+    control: form.control,
+  });
 
   async function handleSubmit(data: CreateBillFormValues) {
     await createBill.mutateAsync(data);
