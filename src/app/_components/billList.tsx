@@ -43,7 +43,7 @@ function BillItemVisibilityToggle({
   isVisible: boolean;
   onToggle: (isVisible: boolean) => void;
 }) {
-  // TODO: change icons to either subtract ingoing or outgoing 
+  // TODO: change icons to either subtract ingoing or outgoing
   return isVisible ? (
     <EyeClosedIcon
       className="text-primary/50 size-5"
