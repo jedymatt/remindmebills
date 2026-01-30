@@ -1,7 +1,7 @@
 import { ObjectId } from "mongodb";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import type { IncomeProfile } from "~/types";
-import { z } from "zod/v3";
+import { z } from "zod";
 
 export const incomeRouter = createTRPCRouter({
   getIncomeProfile: protectedProcedure.query(async ({ ctx }) => {

@@ -1,10 +1,10 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { isFuture, isPast, isToday } from "date-fns";
+import { isFuture } from "date-fns";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { z } from "zod/v3";
+import { z } from "zod";
 import { Button } from "~/components/ui/button";
 import {
   Form,
@@ -25,21 +25,21 @@ import {
 import { api } from "~/trpc/react";
 import { DatePicker } from "./datePicker";
 
-const CreateIncomeProfileFormValues = z.object({
+const CreateIncomeProfileFormValuesSchema = z.object({
   payFrequency: z.enum(["weekly", "fortnightly", "monthly"]),
-  startDate: z.coerce.date().refine((val) => !isFuture(val), {
+  startDate: z.coerce.date<Date>().refine((val) => !isFuture(val), {
     message: "No future dates allowed",
   }),
 });
 
 type CreateIncomeProfileFormValues = z.infer<
-  typeof CreateIncomeProfileFormValues
+  typeof CreateIncomeProfileFormValuesSchema
 >;
 
 export function CreateIncomeProfileForm() {
   // TODO: Add amount field later
-  const form = useForm<CreateIncomeProfileFormValues>({
-    resolver: zodResolver(CreateIncomeProfileFormValues),
+  const form = useForm({
+    resolver: zodResolver(CreateIncomeProfileFormValuesSchema),
   });
   const utils = api.useUtils();
   const createIncomeProfile = api.income.createIncomeProfile.useMutation({

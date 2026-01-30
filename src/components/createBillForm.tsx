@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { z } from "zod/v3";
+import { z } from "zod";
 import { api } from "~/trpc/react";
 import { Button } from "./ui/button";
 import {
@@ -67,37 +67,37 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 
 const BaseBillFormValues = z.object({
   title: z.string().min(1, { message: "Title is required" }),
-  amount: z.coerce.number().min(0).optional(),
+  amount: z.coerce.number<number>().min(0).optional(),
 });
 
 const SingleBillFormValues = BaseBillFormValues.extend({
   type: z.literal("single"),
-  date: z.coerce.date(),
+  date: z.coerce.date<Date>(),
 });
 
 const RecurringBillFormValues = BaseBillFormValues.extend({
   type: z.literal("recurring"),
   recurrence: z.object({
     type: z.enum(["weekly", "monthly"]),
-    interval: z.coerce.number().min(1),
+    interval: z.coerce.number<number>().min(1),
     bymonthday: z.array(z.number()).optional(),
-    dtstart: z.coerce.date(),
-    until: z.coerce.date().optional(),
-    count: z.coerce.number().min(1).optional(),
+    dtstart: z.coerce.date<Date>(),
+    until: z.coerce.date<Date>().optional(),
+    count: z.coerce.number<number>().min(1).optional(),
   }),
 });
 
-const CreateBillFormValues = z.discriminatedUnion("type", [
+const CreateBillFormValuesSchema = z.discriminatedUnion("type", [
   SingleBillFormValues,
   RecurringBillFormValues,
 ]);
 
-type CreateBillFormValues = z.infer<typeof CreateBillFormValues>;
+type CreateBillFormValues = z.infer<typeof CreateBillFormValuesSchema>;
 
 export function CreateBillForm() {
   const router = useRouter();
-  const form = useForm<CreateBillFormValues>({
-    resolver: zodResolver(CreateBillFormValues),
+  const form = useForm({
+    resolver: zodResolver(CreateBillFormValuesSchema),
     defaultValues: {
       title: "",
       type: "single",
@@ -384,7 +384,11 @@ export function CreateBillForm() {
         <Button type="button" variant="outline" onClick={() => router.back()}>
           Cancel
         </Button>
-        <Button type="submit" form="create-bill-form">
+        <Button
+          type="submit"
+          form="create-bill-form"
+          disabled={form.formState.isSubmitting}
+        >
           Create
         </Button>
       </CardFooter>
