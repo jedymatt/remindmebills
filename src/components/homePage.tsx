@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { SVGProps } from "react";
 import { Button } from "~/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { Skeleton } from "~/components/ui/skeleton";
 import { authClient } from "~/lib/auth-client";
 import {
@@ -40,13 +45,14 @@ function SimpleIconsGoogle(props: SVGProps<SVGSVGElement>) {
 const features = [
   {
     icon: Bell,
-    title: "Bill Reminders",
-    description: "Get notified before due dates so you never miss a payment.",
+    title: "Bill Tracking",
+    description: "Keep all your bills organized with due dates and amounts in one place.",
   },
   {
     icon: Repeat,
     title: "Recurring Payments",
-    description: "Track subscriptions and recurring bills with automatic scheduling.",
+    description:
+      "Track subscriptions and recurring bills with automatic scheduling.",
   },
   {
     icon: LayoutDashboard,
@@ -78,13 +84,12 @@ const steps = [
   },
 ] as const;
 
-function NavBar({
-  session,
-  onSignOut,
-}: {
+type NavBarProps = {
   session: { user: { name: string } } | null;
-  onSignOut: () => void;
-}) {
+  onClickSignOut: () => void;
+};
+
+function NavBar({ session, onClickSignOut }: NavBarProps) {
   return (
     <header className="bg-background/80 sticky top-0 z-50 w-full border-b backdrop-blur">
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
@@ -100,7 +105,7 @@ function NavBar({
             <Button asChild size="sm">
               <Link href="/dashboard">Dashboard</Link>
             </Button>
-            <Button variant="ghost" size="sm" onClick={onSignOut}>
+            <Button variant="ghost" size="sm" onClick={onClickSignOut}>
               Sign out
             </Button>
           </div>
@@ -196,7 +201,10 @@ function HowItWorksSection() {
         </h2>
         <div className="mt-10 grid gap-8 sm:grid-cols-3">
           {steps.map((step, i) => (
-            <div key={step.title} className="flex flex-col items-center text-center">
+            <div
+              key={step.title}
+              className="flex flex-col items-center text-center"
+            >
               <div className="bg-primary text-primary-foreground flex size-12 items-center justify-center rounded-full">
                 <step.icon className="size-6" />
               </div>
@@ -257,12 +265,8 @@ function CtaSection() {
 function WelcomeBackSection({ name }: { name: string }) {
   return (
     <section className="flex flex-1 flex-col items-center justify-center px-4 py-20 text-center">
-      <h1 className="text-3xl font-bold lg:text-4xl">
-        Welcome back, {name}
-      </h1>
-      <p className="text-muted-foreground mt-2">
-        Pick up where you left off.
-      </p>
+      <h1 className="text-3xl font-bold lg:text-4xl">Welcome back, {name}</h1>
+      <p className="text-muted-foreground mt-2">Pick up where you left off.</p>
       <Button asChild size="lg" className="mt-6">
         <Link href="/dashboard">
           Go to Dashboard
@@ -325,7 +329,7 @@ export function HomePage() {
 
   return (
     <div className="flex min-h-svh flex-col">
-      <NavBar session={session} onSignOut={handleSignOut} />
+      <NavBar session={session} onClickSignOut={handleSignOut} />
 
       {session ? (
         <WelcomeBackSection name={session.user.name} />
