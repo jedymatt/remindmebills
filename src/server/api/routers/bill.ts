@@ -2,6 +2,7 @@ import { ObjectId } from "mongodb";
 import type { BillEvent } from "~/types";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 
 const BaseBillSchema = z.object({
   title: z.string().trim().min(1, { message: "Title is required" }),
@@ -40,6 +41,63 @@ export const billRouter = createTRPCRouter({
 
     return bills;
   }),
+  getById: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const bill = await ctx.db
+        .collection<BillEvent>("bills")
+        .findOne({
+          _id: new ObjectId(input.id),
+          userId: new ObjectId(ctx.session.user.id),
+        } as any);
+
+      if (!bill) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Bill not found",
+        });
+      }
+
+      return bill;
+    }),
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        data: InputBillSchema,
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const result = await ctx.db.collection("bills").updateOne(
+        {
+          _id: new ObjectId(input.id),
+          userId: new ObjectId(ctx.session.user.id),
+        },
+        { $set: input.data },
+      );
+
+      if (result.matchedCount === 0) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Bill not found",
+        });
+      }
+    }),
+  delete: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const result = await ctx.db.collection("bills").deleteOne({
+        _id: new ObjectId(input.id),
+        userId: new ObjectId(ctx.session.user.id),
+      });
+
+      if (result.deletedCount === 0) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Bill not found",
+        });
+      }
+    }),
   create: protectedProcedure
     .input(InputBillSchema)
     .mutation(async ({ ctx, input }) => {
