@@ -4,6 +4,7 @@ import { formatDate, isEqual, subDays } from "date-fns";
 import { sumBy } from "lodash";
 import { ChevronDown, ChevronUp, EyeClosedIcon, EyeIcon } from "lucide-react";
 import { useMemo, useState } from "react";
+import { BillModal } from "~/components/billModal";
 import { getBillsByPayPeriod } from "~/lib/bill-utils";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
@@ -23,12 +24,14 @@ function BillListCard({
   after,
   isCurrent,
   ingoing,
+  onBillClick,
 }: {
   bills: (BillEvent & { date: Date })[];
   payDate: Date;
   after: Date | null;
   isCurrent: boolean;
   ingoing: number;
+  onBillClick: (billId: string) => void;
 }) {
   const [excludedBills, setExcludedBills] = useState<string[]>([]);
   const [showBreakdown, setShowBreakdown] = useState(false);
@@ -98,16 +101,20 @@ function BillListCard({
                 <li
                   key={bill._id}
                   className={cn(
-                    "flex items-center gap-3 py-3",
+                    "flex items-center gap-3 py-3 cursor-pointer hover:bg-muted/50 -mx-5 px-5 transition-colors",
                     isEqual(bill.date, payDate) &&
                       "text-yellow-700 dark:text-yellow-500",
                     isExcluded && "opacity-40",
                   )}
+                  onClick={() => onBillClick(bill._id)}
                 >
                   <button
                     type="button"
                     className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
-                    onClick={() => toggleExclude(bill._id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleExclude(bill._id);
+                    }}
                   >
                     {isExcluded ? (
                       <EyeClosedIcon className="size-4" />
@@ -197,24 +204,40 @@ function BillListCard({
 export function BillList() {
   const { data: bills } = api.bill.getAll.useQuery();
   const { data: incomeProfile } = api.income.getIncomeProfile.useQuery();
+  const [selectedBillId, setSelectedBillId] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   if (!incomeProfile || !bills) return null;
 
   const billsInPayPeriod = getBillsByPayPeriod(bills, incomeProfile);
   const ingoing = incomeProfile.amount ?? 0;
 
+  const handleBillClick = (billId: string) => {
+    setSelectedBillId(billId);
+    setModalOpen(true);
+  };
+
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {billsInPayPeriod.map(({ payDate, bills, after }, index) => (
-        <BillListCard
-          key={index}
-          payDate={payDate}
-          bills={bills}
-          after={after}
-          isCurrent={index === 0}
-          ingoing={ingoing}
-        />
-      ))}
-    </div>
+    <>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {billsInPayPeriod.map(({ payDate, bills, after }, index) => (
+          <BillListCard
+            key={index}
+            payDate={payDate}
+            bills={bills}
+            after={after}
+            isCurrent={index === 0}
+            ingoing={ingoing}
+            onBillClick={handleBillClick}
+          />
+        ))}
+      </div>
+
+      <BillModal
+        billId={selectedBillId}
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+      />
+    </>
   );
 }
