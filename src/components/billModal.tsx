@@ -410,15 +410,19 @@ export function BillModal({ billId, open, onOpenChange }: BillModalProps) {
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  const { data: bill, isLoading } = api.bill.getById.useQuery(
-    { id: billId! },
-    { enabled: !!billId },
-  );
+  const {
+    data: bill,
+    isLoading,
+    error,
+  } = api.bill.getById.useQuery({ id: billId! }, { enabled: !!billId });
 
   const utils = api.useUtils();
   const deleteBill = api.bill.delete.useMutation({
     onSuccess: async () => {
-      await utils.bill.getAll.invalidate();
+      await Promise.all([
+        utils.bill.getAll.invalidate(),
+        utils.bill.getById.invalidate({ id: bill!._id }),
+      ]);
       toast.success("Bill deleted successfully");
       onOpenChange(false);
     },
@@ -457,6 +461,17 @@ export function BillModal({ billId, open, onOpenChange }: BillModalProps) {
     setMode("view");
   };
 
+  // Handle NOT_FOUND error from getById query
+  if (error) {
+    if (error.data?.code === "NOT_FOUND") {
+      toast.error("This bill no longer exists");
+      onOpenChange(false);
+    } else {
+      toast.error("Failed to load bill");
+    }
+    return null;
+  }
+
   if (!billId) return null;
 
   return (
@@ -470,13 +485,31 @@ export function BillModal({ billId, open, onOpenChange }: BillModalProps) {
           </DialogHeader>
 
           {isLoading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-4 w-20" />
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-4 w-20" />
-              <Skeleton className="h-8 w-32" />
-              <Skeleton className="h-4 w-20" />
-              <Skeleton className="h-8 w-48" />
+            <div className="space-y-6">
+              {/* Badge skeleton for recurring bills */}
+              <Skeleton className="h-6 w-32" />
+
+              {/* Bill details */}
+              <div className="space-y-4">
+                <div>
+                  <Skeleton className="mb-2 h-4 w-12" />
+                  <Skeleton className="h-6 w-48" />
+                </div>
+                <div>
+                  <Skeleton className="mb-2 h-4 w-16" />
+                  <Skeleton className="h-6 w-32" />
+                </div>
+                <div>
+                  <Skeleton className="mb-2 h-4 w-20" />
+                  <Skeleton className="h-5 w-40" />
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex justify-end gap-2">
+                <Skeleton className="h-10 w-20" />
+                <Skeleton className="h-10 w-20" />
+              </div>
             </div>
           ) : bill ? (
             mode === "view" ? (
