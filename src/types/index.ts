@@ -27,6 +27,10 @@ export type BillEvent = {
   userId: ObjectId;
 } & (Single | Recurring);
 
+export type PlaygroundBill = Omit<BillEvent, "_id" | "userId"> & {
+  id: string; // Local UUID instead of MongoDB ObjectId
+};
+
 export interface IncomeProfile {
   payFrequency: "weekly" | "fortnightly" | "monthly";
   startDate: Date;
