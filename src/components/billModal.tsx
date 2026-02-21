@@ -1,14 +1,17 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { z } from "zod";
 import { api } from "~/trpc/react";
 import type { BillEvent } from "~/types";
+import {
+  BillFormFields,
+  BillFormValuesSchema,
+  type BillFormValues,
+} from "~/components/billFormFields";
 import { BillViewMode } from "./billViewMode";
 import {
   AlertDialog,
@@ -27,62 +30,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "./ui/form";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
-import { Separator } from "./ui/separator";
 import { Skeleton } from "./ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 
 interface BillModalProps {
   billId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
-const BaseBillFormValues = z.object({
-  title: z.string().min(1, { message: "Title is required" }),
-  amount: z.coerce.number<number>().min(0).optional(),
-});
-
-const SingleBillFormValues = BaseBillFormValues.extend({
-  type: z.literal("single"),
-  date: z.coerce.date<Date>(),
-});
-
-const RecurringBillFormValues = BaseBillFormValues.extend({
-  type: z.literal("recurring"),
-  recurrence: z.object({
-    type: z.enum(["weekly", "monthly"]),
-    interval: z.coerce.number<number>().min(1),
-    bymonthday: z.array(z.number()).optional(),
-    dtstart: z.coerce.date<Date>(),
-    until: z.coerce.date<Date>().optional(),
-    count: z.coerce.number<number>().min(1).optional(),
-  }),
-});
-
-const BillFormValuesSchema = z.discriminatedUnion("type", [
-  SingleBillFormValues,
-  RecurringBillFormValues,
-]);
-
-type BillFormValues = z.infer<typeof BillFormValuesSchema>;
 
 function BillEditMode({
   bill,
@@ -141,10 +95,13 @@ function BillEditMode({
       : "never",
   );
 
-  const [formType, formRecurrenceType] = useWatch({
-    name: ["type", "recurrence.type"],
-    control: form.control,
-  });
+  const handleRecurringEndsWithChange = (
+    value: "never" | "until" | "count",
+  ) => {
+    setRecurringEndsWith(value);
+    if (value !== "count") form.setValue("recurrence.count", undefined);
+    if (value !== "until") form.setValue("recurrence.until", undefined);
+  };
 
   async function handleSubmit(data: BillFormValues) {
     await updateBill.mutateAsync({
@@ -155,233 +112,14 @@ function BillEditMode({
 
   return (
     <div>
-      <Form {...form}>
-        <form
-          id="edit-bill-form"
-          onSubmit={form.handleSubmit(handleSubmit)}
-          className="space-y-4"
-        >
-          {/* Title Field */}
-          <FormField
-            control={form.control}
-            name="title"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Title</FormLabel>
-                <FormControl>
-                  <Input type="text" placeholder="Title" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+      <BillFormFields
+        form={form}
+        recurringEndsWith={recurringEndsWith}
+        onRecurringEndsWithChange={handleRecurringEndsWithChange}
+        formId="edit-bill-form"
+        onSubmit={handleSubmit}
+      />
 
-          {/* Amount Field */}
-          <FormField
-            control={form.control}
-            name="amount"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Amount (optional)</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    placeholder="Amount"
-                    {...field}
-                    value={field.value ?? ""}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <Separator />
-
-          {/* Type Tabs - Same as CreateBillForm */}
-          <Tabs
-            value={formType}
-            onValueChange={(value) =>
-              form.setValue("type", value as BillFormValues["type"])
-            }
-          >
-            <TabsList className="w-full">
-              <TabsTrigger value="single">Once</TabsTrigger>
-              <TabsTrigger value="recurring">Repeating</TabsTrigger>
-            </TabsList>
-
-            {/* Single Bill Tab */}
-            <TabsContent value="single" className="space-y-4">
-              <FormField
-                control={form.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Date</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="date"
-                        placeholder="Date"
-                        {...field}
-                        value={
-                          field.value ? format(field.value, "yyyy-MM-dd") : ""
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </TabsContent>
-
-            {/* Recurring Bill Tab - Complete form like CreateBillForm */}
-            <TabsContent value="recurring" className="space-y-4">
-              <FormField
-                control={form.control}
-                name="recurrence.type"
-                defaultValue="monthly"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Every</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="weekly">Week</SelectItem>
-                        <SelectItem value="monthly">Month</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="recurrence.interval"
-                defaultValue={1}
-                rules={{ min: 1 }}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      Repeats every {Number(field.value) ?? 1}{" "}
-                      {formRecurrenceType === "weekly"
-                        ? "week" + (Number(field.value) !== 1 ? "s" : "")
-                        : "month" + (Number(field.value) !== 1 ? "s" : "")}
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="Interval"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="recurrence.dtstart"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Date Start</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="date"
-                        placeholder="Date Start"
-                        {...field}
-                        value={
-                          field.value ? format(field.value, "yyyy-MM-dd") : ""
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormLabel>Ends...</FormLabel>
-              <RadioGroup
-                value={recurringEndsWith}
-                onValueChange={(value) =>
-                  setRecurringEndsWith(value as typeof recurringEndsWith)
-                }
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="never" id="never" />
-                  <Label htmlFor="never">Never</Label>
-                </div>
-
-                <div className="flex items-start space-x-2">
-                  <RadioGroupItem value="count" id="count" />
-                  <FormField
-                    control={form.control}
-                    name="recurrence.count"
-                    rules={{ min: 1 }}
-                    defaultValue={1}
-                    disabled={recurringEndsWith !== "count"}
-                    render={({ field }) => (
-                      <FormItem className="pt-0.5">
-                        <FormLabel onClick={() => setRecurringEndsWith("count")}>
-                          After
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="No. of terms"
-                            {...field}
-                            value={field.value ?? ""}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="flex items-start space-x-2">
-                  <RadioGroupItem value="until" id="until" />
-                  <FormField
-                    control={form.control}
-                    name="recurrence.until"
-                    disabled={recurringEndsWith !== "until"}
-                    render={({ field }) => (
-                      <FormItem className="pt-0.5">
-                        <FormLabel onClick={() => setRecurringEndsWith("until")}>
-                          Until
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            type="date"
-                            placeholder="Until"
-                            {...field}
-                            value={
-                              field.value
-                                ? format(field.value, "yyyy-MM-dd")
-                                : ""
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </RadioGroup>
-            </TabsContent>
-          </Tabs>
-        </form>
-      </Form>
-
-      {/* Action Buttons */}
       <div className="mt-6 flex justify-end gap-2">
         <Button
           type="button"
