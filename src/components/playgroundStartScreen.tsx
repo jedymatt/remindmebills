@@ -1,6 +1,7 @@
 "use client";
 
 import { FlaskConical, Copy, FileText } from "lucide-react";
+import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import {
   Card,
@@ -57,7 +58,12 @@ export function PlaygroundStartScreen({
         </Card>
 
         <Card
-          className="cursor-pointer transition-colors hover:border-primary disabled:cursor-not-allowed disabled:opacity-50"
+          className={cn(
+            "transition-colors",
+            isBillsLoading
+              ? "cursor-not-allowed opacity-50"
+              : "cursor-pointer hover:border-primary",
+          )}
           onClick={isBillsLoading ? undefined : handleCloneBills}
         >
           <CardHeader className="pb-2">

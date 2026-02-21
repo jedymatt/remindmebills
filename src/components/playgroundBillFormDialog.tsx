@@ -98,14 +98,25 @@ export function PlaygroundBillFormDialog({
     };
     onSubmit(bill);
     form.reset();
+    setRecurringEndsWith("never");
     onOpenChange(false);
   };
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       form.reset();
+      setRecurringEndsWith("never");
     }
     onOpenChange(open);
+  };
+
+  const handleRecurringEndsWithChange = (
+    value: "never" | "until" | "count",
+  ) => {
+    setRecurringEndsWith(value);
+    // Clear the opposing field values so they don't silently affect recurrence
+    if (value !== "count") form.setValue("recurrence.count", undefined);
+    if (value !== "until") form.setValue("recurrence.until", undefined);
   };
 
   return (
@@ -264,7 +275,9 @@ export function PlaygroundBillFormDialog({
                 <RadioGroup
                   value={recurringEndsWith}
                   onValueChange={(value) =>
-                    setRecurringEndsWith(value as typeof recurringEndsWith)
+                    handleRecurringEndsWithChange(
+                      value as typeof recurringEndsWith,
+                    )
                   }
                 >
                   <div className="flex items-center space-x-2">

@@ -43,10 +43,11 @@ function playgroundReducer(
     case "INIT_CLONE":
       return {
         bills: action.bills.map((bill): PlaygroundBill => {
+          // Cast via `any` because BillEvent._id is typed as string but the
+          // MongoDB driver returns ObjectId at runtime, making typed
+          // destructuring impractical without a richer BillEvent definition.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { _id, userId, ...rest } = bill as any;
-          void _id;
-          void userId;
+          const { _id: _discardId, userId: _discardUserId, ...rest } = bill as any;
           return {
             ...rest,
             id: crypto.randomUUID(),

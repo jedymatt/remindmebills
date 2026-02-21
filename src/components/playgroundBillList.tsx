@@ -234,7 +234,7 @@ export function PlaygroundBillList({
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {mappedPeriods.map(({ payDate, bills, after }, index) => (
         <PlaygroundBillListCard
-          key={index}
+          key={payDate.toISOString()}
           payDate={payDate}
           bills={bills}
           after={after}
