@@ -79,11 +79,19 @@ export function BillFormFields({
     control: form.control,
   });
 
+  const handleInternalSubmit = (data: BillFormValues) => {
+    if (data.type === "recurring") {
+      if (recurringEndsWith !== "count") data.recurrence.count = undefined;
+      if (recurringEndsWith !== "until") data.recurrence.until = undefined;
+    }
+    return onSubmit(data);
+  };
+
   return (
     <Form {...form}>
       <form
         id={formId}
-        onSubmit={form.handleSubmit(onSubmit)}
+        onSubmit={form.handleSubmit(handleInternalSubmit)}
         className="space-y-4"
       >
         <FormField
