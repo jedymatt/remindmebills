@@ -1,6 +1,7 @@
 "use client";
 
 import { Receipt } from "lucide-react";
+import Link from "next/link";
 import { api } from "~/trpc/react";
 import type { IncomeProfile } from "~/types";
 import { AuthenticatedLayout } from "./authenticatedLayout";
@@ -39,12 +40,12 @@ function NoIncomeProfileState() {
           To use the playground, you need to set up your income profile on the
           dashboard first.
         </p>
-        <a
+        <Link
           href="/dashboard"
           className="text-primary mt-4 text-sm font-medium hover:underline"
         >
           Go to Dashboard
-        </a>
+        </Link>
       </div>
     </div>
   );

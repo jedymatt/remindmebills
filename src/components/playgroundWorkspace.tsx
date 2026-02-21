@@ -52,6 +52,18 @@ export function PlaygroundWorkspace() {
     dispatch({ type: "DELETE_BILL", id });
   };
 
+  const handleReset = () => {
+    dispatch({ type: "RESET" });
+    // Clear local UI state so a stale modal can't persist after reset
+    setSelectedBill(null);
+    setBillModalOpen(false);
+  };
+
+  const handleBillModalOpenChange = (open: boolean) => {
+    setBillModalOpen(open);
+    if (!open) setSelectedBill(null);
+  };
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
       <PlaygroundBanner />
@@ -88,7 +100,7 @@ export function PlaygroundWorkspace() {
       )}
 
       <div className="flex justify-center pt-4">
-        <Button variant="outline" onClick={() => dispatch({ type: "RESET" })}>
+        <Button variant="outline" onClick={handleReset}>
           <RotateCcw className="mr-2 size-4" />
           Reset Playground
         </Button>
@@ -103,7 +115,7 @@ export function PlaygroundWorkspace() {
       <PlaygroundBillModal
         bill={selectedBill}
         open={billModalOpen}
-        onOpenChange={setBillModalOpen}
+        onOpenChange={handleBillModalOpenChange}
         onUpdate={handleUpdateBill}
         onDelete={handleDeleteBill}
       />

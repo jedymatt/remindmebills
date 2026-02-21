@@ -123,9 +123,11 @@ function PlaygroundBillViewMode({
               {bill.recurrence.type === "weekly" ? "week" : "month"}
               {bill.recurrence.interval !== 1 ? "s" : ""}
             </p>
-            <p className="text-muted-foreground text-sm">
-              Starting {format(bill.recurrence.dtstart!, "MMMM d, yyyy")}
-            </p>
+            {bill.recurrence.dtstart && (
+              <p className="text-muted-foreground text-sm">
+                Starting {format(bill.recurrence.dtstart, "MMMM d, yyyy")}
+              </p>
+            )}
           </div>
         )}
       </div>

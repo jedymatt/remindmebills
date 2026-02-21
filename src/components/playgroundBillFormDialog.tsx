@@ -295,7 +295,7 @@ export function PlaygroundBillFormDialog({
                       render={({ field }) => (
                         <FormItem className="pt-0.5">
                           <FormLabel
-                            onClick={() => setRecurringEndsWith("count")}
+                            onClick={() => handleRecurringEndsWithChange("count")}
                           >
                             After
                           </FormLabel>
@@ -321,7 +321,7 @@ export function PlaygroundBillFormDialog({
                       render={({ field }) => (
                         <FormItem className="pt-0.5">
                           <FormLabel
-                            onClick={() => setRecurringEndsWith("until")}
+                            onClick={() => handleRecurringEndsWithChange("until")}
                           >
                             Until
                           </FormLabel>
