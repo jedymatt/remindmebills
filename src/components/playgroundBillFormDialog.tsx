@@ -41,8 +41,6 @@ export function PlaygroundBillFormDialog({
     value: "never" | "until" | "count",
   ) => {
     setRecurringEndsWith(value);
-    if (value !== "count") form.setValue("recurrence.count", undefined);
-    if (value !== "until") form.setValue("recurrence.until", undefined);
   };
 
   const handleSubmit = (data: BillFormValues) => {

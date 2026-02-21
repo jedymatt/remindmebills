@@ -43,8 +43,6 @@ export function CreateBillForm() {
     value: "never" | "until" | "count",
   ) => {
     setRecurringEndsWith(value);
-    if (value !== "count") form.setValue("recurrence.count", undefined);
-    if (value !== "until") form.setValue("recurrence.until", undefined);
   };
 
   async function handleSubmit(data: BillFormValues) {
