@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, type PropsWithChildren } from "react";
-import { Receipt } from "lucide-react";
+import { FlaskConical, Receipt } from "lucide-react";
 
 import { useQueryClient } from "@tanstack/react-query";
 import { authClient } from "~/lib/auth-client";
@@ -72,14 +72,41 @@ function UserNav() {
 }
 
 export function AuthenticatedLayout({ children }: PropsWithChildren) {
+  const pathname = usePathname();
+
   return (
     <div className="flex min-h-svh flex-col">
       <header className="bg-background/80 sticky top-0 z-50 border-b backdrop-blur">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2 font-semibold">
-            <Receipt className="size-5" />
-            <span>Remind Me Bills</span>
-          </Link>
+          <div className="flex items-center gap-6">
+            <Link href="/" className="flex items-center gap-2 font-semibold">
+              <Receipt className="size-5" />
+              <span>Remind Me Bills</span>
+            </Link>
+            <nav className="hidden items-center gap-4 sm:flex">
+              <Link
+                href="/dashboard"
+                className={`text-sm font-medium transition-colors hover:text-foreground ${
+                  pathname === "/dashboard"
+                    ? "text-foreground"
+                    : "text-muted-foreground"
+                }`}
+              >
+                Dashboard
+              </Link>
+              <Link
+                href="/playground"
+                className={`flex items-center gap-1 text-sm font-medium transition-colors hover:text-foreground ${
+                  pathname === "/playground"
+                    ? "text-foreground"
+                    : "text-muted-foreground"
+                }`}
+              >
+                <FlaskConical className="size-3.5" />
+                Playground
+              </Link>
+            </nav>
+          </div>
           <UserNav />
         </div>
       </header>

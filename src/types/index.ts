@@ -27,6 +27,23 @@ export type BillEvent = {
   userId: ObjectId;
 } & (Single | Recurring);
 
+// PlaygroundBillData: bill fields without the local id.
+// Defined as an explicit discriminated union — Omit<PlaygroundBill, "id">
+// does NOT distribute over unions and collapses the discriminant.
+export type PlaygroundBillData =
+  | { title: string; amount?: number; type: "single"; date: Date }
+  | { title: string; amount?: number; type: "recurring"; recurrence: Recurrence };
+
+export type PlaygroundBill =
+  | { id: string; title: string; amount?: number; type: "single"; date: Date }
+  | {
+      id: string;
+      title: string;
+      amount?: number;
+      type: "recurring";
+      recurrence: Recurrence;
+    };
+
 export interface IncomeProfile {
   payFrequency: "weekly" | "fortnightly" | "monthly";
   startDate: Date;
