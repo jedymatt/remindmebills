@@ -239,7 +239,6 @@ export function BillFormFields({
                   name="recurrence.count"
                   rules={{ min: 1 }}
                   defaultValue={1}
-                  disabled={recurringEndsWith !== "count"}
                   render={({ field }) => (
                     <FormItem className="pt-0.5">
                       <FormLabel
@@ -252,6 +251,7 @@ export function BillFormFields({
                           type="number"
                           placeholder="No. of terms"
                           {...field}
+                          disabled={recurringEndsWith !== "count"}
                           value={field.value ?? ""}
                         />
                       </FormControl>
@@ -265,7 +265,6 @@ export function BillFormFields({
                 <FormField
                   control={form.control}
                   name="recurrence.until"
-                  disabled={recurringEndsWith !== "until"}
                   render={({ field }) => (
                     <FormItem className="pt-0.5">
                       <FormLabel
@@ -278,6 +277,7 @@ export function BillFormFields({
                           type="date"
                           placeholder="Until"
                           {...field}
+                          disabled={recurringEndsWith !== "until"}
                           value={
                             field.value
                               ? format(field.value, "yyyy-MM-dd")
