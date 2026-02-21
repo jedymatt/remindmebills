@@ -11,6 +11,7 @@ Remind Me Bills — a Next.js full-stack app for tracking bills and recurring pa
 ```bash
 pnpm dev              # Dev server with Turbopack
 pnpm build            # Production build
+pnpm preview          # Build + start production server locally
 pnpm check            # Lint + typecheck (run before committing)
 pnpm lint             # ESLint only
 pnpm lint:fix         # ESLint with auto-fix
@@ -30,7 +31,7 @@ No test framework is configured.
 - **Database:** MongoDB (native driver, no ORM) — database name: `main`
 - **Auth:** Better Auth with Google OAuth + anonymous sign-in
 - **State:** TanStack React Query (via tRPC bindings), React Hook Form + Zod
-- **UI:** Shadcn/ui (New York style) + Radix UI + Tailwind CSS 4 + Lucide icons
+- **UI:** Shadcn/ui (New York style) + Radix UI + Tailwind CSS 4 + Lucide icons + Sonner (toasts)
 - **Env validation:** `@t3-oss/env-nextjs` in `src/env.js`
 
 ### Key Directories
@@ -42,7 +43,18 @@ No test framework is configured.
 - `src/server/db/` — MongoDB client (singleton, cached in dev via `globalThis`)
 - `src/trpc/` — Client-side tRPC setup (`react.tsx` for React Query, `server.ts` for RSC)
 - `src/components/ui/` — Shadcn/ui components
+- `src/components/` — Domain components (BillFormFields, BillModal, CreateBillForm, PlaygroundWorkspace, etc.)
+- `src/app/_components/` — Shared RSC components (billList, post)
+- `src/types/` — Domain types: `BillEvent`, `PlaygroundBill`, `IncomeProfile`, `Recurrence`
 - `src/lib/` — Shared utilities (auth client, utils)
+- `src/lib/bill-utils.ts` — Recurrence helpers using rrule (pay rules, bill scheduling)
+
+### Routes
+- `/` — Home/landing page
+- `/dashboard` — Main bill dashboard (protected)
+- `/bills` — Bill list (protected)
+- `/bills/create` — Create bill form (protected)
+- `/playground` — Guest-accessible demo area with local-only bill state
 
 ### API Pattern (tRPC)
 - Routers live in `src/server/api/routers/`. Each exports a router created with `createTRPCRouter`.
@@ -55,7 +67,7 @@ No test framework is configured.
 ### Auth
 - Better Auth configured in `src/server/auth/config.ts` with MongoDB adapter.
 - Providers: Google OAuth, anonymous sign-in (guest mode).
-- Route protection via Next.js middleware in `src/proxy.ts` — checks session for `/dashboard`.
+- Route protection via Next.js middleware in `src/proxy.ts` — checks session for `/dashboard`. Uses optimistic redirect (not fully secure per Better Auth docs) — handle auth checks in individual pages too.
 - Client auth: `src/lib/auth-client.ts` exports `authClient` with `signIn`, `signOut`, `useSession`.
 
 ### Forms & Validation
