@@ -7,7 +7,12 @@ import {
   type Dispatch,
   type PropsWithChildren,
 } from "react";
-import type { IncomeProfile, PlaygroundBill, BillEvent } from "~/types";
+import type {
+  IncomeProfile,
+  PlaygroundBill,
+  PlaygroundBillData,
+  BillEvent,
+} from "~/types";
 
 interface PlaygroundState {
   bills: PlaygroundBill[];
@@ -19,7 +24,7 @@ type PlaygroundAction =
   | { type: "INIT_FRESH"; incomeProfile: IncomeProfile }
   | { type: "INIT_CLONE"; incomeProfile: IncomeProfile; bills: BillEvent[] }
   | { type: "ADD_BILL"; bill: PlaygroundBill }
-  | { type: "UPDATE_BILL"; id: string; data: Omit<PlaygroundBill, "id"> }
+  | { type: "UPDATE_BILL"; id: string; data: PlaygroundBillData }
   | { type: "DELETE_BILL"; id: string }
   | { type: "RESET" };
 
@@ -42,16 +47,12 @@ function playgroundReducer(
       };
     case "INIT_CLONE":
       return {
-        bills: action.bills.map((bill): PlaygroundBill => {
-          // Cast via `any` because BillEvent._id is typed as string but the
-          // MongoDB driver returns ObjectId at runtime, making typed
-          // destructuring impractical without a richer BillEvent definition.
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { _id: _discardId, userId: _discardUserId, ...rest } = bill as any;
-          return {
-            ...rest,
-            id: crypto.randomUUID(),
-          };
+        bills: action.bills.map<PlaygroundBill>((bill) => {
+          const id = crypto.randomUUID();
+          if (bill.type === "single") {
+            return { id, title: bill.title, amount: bill.amount, type: "single", date: bill.date };
+          }
+          return { id, title: bill.title, amount: bill.amount, type: "recurring", recurrence: bill.recurrence };
         }),
         incomeProfile: action.incomeProfile,
         isInitialized: true,
