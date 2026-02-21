@@ -63,6 +63,7 @@ interface BillFormFieldsProps {
   onRecurringEndsWithChange: (value: "never" | "until" | "count") => void;
   formId: string;
   onSubmit: (data: BillFormValues) => void | Promise<void>;
+  titlePlaceholder?: string;
 }
 
 export function BillFormFields({
@@ -71,6 +72,7 @@ export function BillFormFields({
   onRecurringEndsWithChange,
   formId,
   onSubmit,
+  titlePlaceholder = "Title",
 }: BillFormFieldsProps) {
   const [formType, formRecurrenceType] = useWatch({
     name: ["type", "recurrence.type"],
@@ -91,7 +93,7 @@ export function BillFormFields({
             <FormItem>
               <FormLabel>Title</FormLabel>
               <FormControl>
-                <Input type="text" placeholder="Title" {...field} />
+                <Input type="text" placeholder={titlePlaceholder} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

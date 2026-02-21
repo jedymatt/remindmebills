@@ -80,6 +80,7 @@ export function PlaygroundBillFormDialog({
           onRecurringEndsWithChange={handleRecurringEndsWithChange}
           formId="playground-bill-form"
           onSubmit={handleSubmit}
+          titlePlaceholder="e.g., Car Loan"
         />
 
         <div className="flex justify-end gap-2">
