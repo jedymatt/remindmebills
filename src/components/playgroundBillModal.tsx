@@ -22,6 +22,7 @@ import { Button } from "./ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
@@ -500,6 +501,11 @@ export function PlaygroundBillModal({
             <DialogTitle>
               {mode === "view" ? "Bill Details" : "Edit Bill"}
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              {mode === "view"
+                ? "View and manage this playground bill."
+                : "Edit the details of this playground bill."}
+            </DialogDescription>
           </DialogHeader>
 
           {mode === "view" ? (

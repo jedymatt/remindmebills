@@ -9,6 +9,7 @@ import { Button } from "./ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
@@ -124,6 +125,9 @@ export function PlaygroundBillFormDialog({
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Add Hypothetical Bill</DialogTitle>
+          <DialogDescription className="sr-only">
+            Add a hypothetical bill to explore its impact on your budget.
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>

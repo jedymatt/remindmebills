@@ -2,6 +2,7 @@
 
 import { Receipt } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { api } from "~/trpc/react";
 import type { IncomeProfile } from "~/types";
 import { AuthenticatedLayout } from "./authenticatedLayout";
@@ -64,10 +65,18 @@ function PlaygroundContent({ incomeProfile }: { incomeProfile: IncomeProfile }) 
 }
 
 function PlaygroundPageInner() {
+  const [mounted, setMounted] = useState(false);
   const { data: incomeProfile, isLoading } =
     api.income.getIncomeProfile.useQuery();
 
-  if (isLoading) {
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Show skeleton on first render so server and client produce identical HTML,
+  // preventing the hydration mismatch that occurs when the React Query cache
+  // already has data from a previous page navigation.
+  if (!mounted || isLoading) {
     return <PlaygroundSkeleton />;
   }
 
