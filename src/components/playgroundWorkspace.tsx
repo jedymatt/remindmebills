@@ -26,7 +26,7 @@ export function PlaygroundWorkspace() {
   const billsAsBillEvent = bills.map((bill) => ({
     ...bill,
     _id: bill.id,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
     userId: null as any,
   })) as unknown as BillEvent[];
 
