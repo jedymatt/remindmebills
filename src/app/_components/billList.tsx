@@ -39,7 +39,7 @@ function BillListCard({
   const outgoing = useMemo(
     () =>
       sumBy(
-        bills.filter((bill) => !excludedBills.includes(bill._id)),
+        bills.filter((bill) => !excludedBills.includes(bill._id.toString())),
         (bill) => bill.amount ?? 0,
       ),
     [bills, excludedBills],
@@ -96,24 +96,24 @@ function BillListCard({
         ) : (
           <ul className="divide-y">
             {bills.map((bill) => {
-              const isExcluded = excludedBills.includes(bill._id);
+              const isExcluded = excludedBills.includes(bill._id.toString());
               return (
                 <li
-                  key={bill._id}
+                  key={bill._id.toString()}
                   className={cn(
                     "flex items-center gap-3 py-3 cursor-pointer hover:bg-muted/50 -mx-5 px-5 transition-colors",
                     isEqual(bill.date, payDate) &&
                       "text-yellow-700 dark:text-yellow-500",
                     isExcluded && "opacity-40",
                   )}
-                  onClick={() => onBillClick(bill._id)}
+                  onClick={() => onBillClick(bill._id.toString())}
                 >
                   <button
                     type="button"
                     className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
                     onClick={(e) => {
                       e.stopPropagation();
-                      toggleExclude(bill._id);
+                      toggleExclude(bill._id.toString());
                     }}
                   >
                     {isExcluded ? (

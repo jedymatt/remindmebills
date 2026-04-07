@@ -101,7 +101,7 @@ function PlaygroundBillListCard({
                 <li
                   key={bill.id}
                   className={cn(
-                    "flex cursor-pointer items-center gap-3 py-3 -mx-5 px-5 transition-colors hover:bg-muted/50",
+                    "hover:bg-muted/50 -mx-5 flex cursor-pointer items-center gap-3 px-5 py-3 transition-colors",
                     isEqual(bill.date, payDate) &&
                       "text-yellow-700 dark:text-yellow-500",
                     isExcluded && "opacity-40",
@@ -226,8 +226,8 @@ export function PlaygroundBillList({
     ...period,
     bills: period.bills.map((bill) => ({
       ...bill,
-      id: bill._id,
-    })) as (PlaygroundBill & { date: Date })[],
+      id: bill._id.toString(),
+    })),
   }));
 
   return (

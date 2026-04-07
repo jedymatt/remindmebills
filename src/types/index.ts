@@ -21,7 +21,7 @@ export type Recurring = {
 };
 
 export type BillEvent = {
-  _id: string;
+  _id: ObjectId;
   title: string;
   amount?: number;
   userId: ObjectId;
