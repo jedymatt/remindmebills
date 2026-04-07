@@ -1,8 +1,8 @@
-import { ObjectId } from "mongodb";
+import { TRPCError } from "@trpc/server";
+import { ObjectId, type WithoutId } from "mongodb";
+import { z } from "zod";
 import type { BillEvent } from "~/types";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { z } from "zod";
-import { TRPCError } from "@trpc/server";
 
 const BaseBillSchema = z.object({
   title: z.string().trim().min(1, { message: "Title is required" }),
@@ -52,11 +52,11 @@ export const billRouter = createTRPCRouter({
       }
 
       const bill = await ctx.db
-        .collection<BillEvent>("bills")
+        .collection<WithoutId<BillEvent>>("bills")
         .findOne({
           _id: new ObjectId(input.id),
           userId: new ObjectId(ctx.session.user.id),
-        } as any);
+        });
 
       if (!bill) {
         throw new TRPCError({
@@ -82,13 +82,15 @@ export const billRouter = createTRPCRouter({
         });
       }
 
-      const result = await ctx.db.collection("bills").updateOne(
-        {
-          _id: new ObjectId(input.id),
-          userId: new ObjectId(ctx.session.user.id),
-        },
-        { $set: input.data },
-      );
+      const result = await ctx.db
+        .collection<WithoutId<BillEvent>>("bills")
+        .updateOne(
+          {
+            _id: new ObjectId(input.id),
+            userId: new ObjectId(ctx.session.user.id),
+          },
+          { $set: input.data },
+        );
 
       if (result.matchedCount === 0) {
         throw new TRPCError({
@@ -122,7 +124,7 @@ export const billRouter = createTRPCRouter({
   create: protectedProcedure
     .input(InputBillSchema)
     .mutation(async ({ ctx, input }) => {
-      const bill: Omit<BillEvent, "_id"> = {
+      const bill: WithoutId<BillEvent> = {
         ...input,
         userId: new ObjectId(ctx.session.user.id),
       };
