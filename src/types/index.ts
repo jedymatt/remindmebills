@@ -1,30 +1,17 @@
-import type { ObjectId } from "mongodb";
+import type { z } from "zod";
+import type { RecurringBillSchema, SingleBillSchema } from "~/schemas/bill";
 
 // todo: follow the type of rrule.js
-export interface Recurrence {
-  type: "weekly" | "monthly";
-  interval: number;
-  bymonthday?: number[];
-  dtstart?: Date;
-  until?: Date;
-  count?: number;
-}
+export type Single = z.infer<typeof SingleBillSchema>;
 
-export type Single = {
-  type: "single";
-  date: Date;
-};
-
-export type Recurring = {
-  type: "recurring";
-  recurrence: Recurrence;
-};
+export type Recurring = z.infer<typeof RecurringBillSchema>;
+type Recurrence = Recurring["recurrence"];
 
 export type BillEvent = {
-  _id: ObjectId;
+  _id: string;
   title: string;
   amount?: number;
-  userId: ObjectId;
+  userId: string;
 } & (Single | Recurring);
 
 // PlaygroundBillData: bill fields without the local id.
@@ -32,7 +19,12 @@ export type BillEvent = {
 // does NOT distribute over unions and collapses the discriminant.
 export type PlaygroundBillData =
   | { title: string; amount?: number; type: "single"; date: Date }
-  | { title: string; amount?: number; type: "recurring"; recurrence: Recurrence };
+  | {
+      title: string;
+      amount?: number;
+      type: "recurring";
+      recurrence: Recurrence;
+    };
 
 export type PlaygroundBill =
   | { id: string; title: string; amount?: number; type: "single"; date: Date }

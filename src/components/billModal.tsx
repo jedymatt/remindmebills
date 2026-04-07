@@ -73,7 +73,7 @@ function BillEditMode({
     onSuccess: async () => {
       await Promise.all([
         utils.bill.getAll.invalidate(),
-        utils.bill.getById.invalidate({ id: bill._id.toString() }),
+        utils.bill.getById.invalidate({ id: bill._id }),
       ]);
       toast.success("Bill updated successfully");
       onSaveSuccess();
@@ -157,7 +157,7 @@ export function BillModal({ billId, open, onOpenChange }: BillModalProps) {
     onSuccess: async () => {
       await Promise.all([
         utils.bill.getAll.invalidate(),
-        utils.bill.getById.invalidate({ id: bill?._id.toString() }),
+        utils.bill.getById.invalidate({ id: bill?._id }),
       ]);
       toast.success("Bill deleted successfully");
       onOpenChange(false);
