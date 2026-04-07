@@ -2,24 +2,8 @@ import { TRPCError } from "@trpc/server";
 import { ObjectId, type WithoutId } from "mongodb";
 import type { Simplify } from "type-fest";
 import { z } from "zod";
+import { RecurringBillSchema, SingleBillSchema } from "~/schemas/bill";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-
-export const SingleBillSchema = z.object({
-  type: z.literal("single"),
-  date: z.date(),
-});
-
-export const RecurringBillSchema = z.object({
-  type: z.literal("recurring"),
-  recurrence: z.object({
-    type: z.enum(["weekly", "monthly"]),
-    interval: z.number().min(1),
-    bymonthday: z.number().array().optional(),
-    dtstart: z.date(),
-    until: z.date().optional(),
-    count: z.number().optional(),
-  }),
-});
 
 const InputBillSchema = z
   .object({

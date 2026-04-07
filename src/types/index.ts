@@ -1,10 +1,10 @@
-import type z from "zod";
-import type { RecurringBillSchema, SingleBillSchema } from "~/server/api/routers/bill";
+import type { z } from "zod";
+import type { RecurringBillSchema, SingleBillSchema } from "~/schemas/bill";
 
 // todo: follow the type of rrule.js
 export type Single = z.infer<typeof SingleBillSchema>;
 
-export type Recurring = z.infer<typeof RecurringBillSchema>
+export type Recurring = z.infer<typeof RecurringBillSchema>;
 type Recurrence = Recurring["recurrence"];
 
 export type BillEvent = {
