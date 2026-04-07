@@ -1,6 +1,7 @@
 [tools]
 "aqua:git-town/git-town" = "latest"
 node = "lts"
+pnpm = "latest"
 
 [shell_alias]
 gt = "git-town"
