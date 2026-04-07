@@ -226,7 +226,7 @@ export function PlaygroundBillList({
     ...period,
     bills: period.bills.map((bill) => ({
       ...bill,
-      id: bill._id.toString(),
+      id: bill._id,
     })),
   }));
 
