@@ -2,6 +2,8 @@
 
 import { format } from "date-fns";
 import { Calendar, Repeat } from "lucide-react";
+import { colorForOrder } from "~/lib/group-colors";
+import { api } from "~/trpc/react";
 import type { BillEvent } from "~/types";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -13,6 +15,13 @@ interface BillViewModeProps {
 }
 
 export function BillViewMode({ bill, onEdit, onDelete }: BillViewModeProps) {
+  const { data: groups } = api.group.getAll.useQuery(undefined, {
+    enabled: !!bill.groupId,
+  });
+  const group = bill.groupId
+    ? groups?.find((g) => g._id === bill.groupId)
+    : null;
+
   return (
     <div className="space-y-6">
       {/* Bill Type Badge */}
@@ -48,6 +57,19 @@ export function BillViewMode({ bill, onEdit, onDelete }: BillViewModeProps) {
             )}
           </p>
         </div>
+
+        {group && (
+          <div>
+            <label className="text-muted-foreground text-sm">Group</label>
+            <div className="flex items-center gap-2">
+              <span
+                className="inline-block size-3 rounded-full"
+                style={{ backgroundColor: colorForOrder(group.order) }}
+              />
+              <p className="font-medium">{group.name}</p>
+            </div>
+          </div>
+        )}
 
         {bill.type === "single" && (
           <div>
