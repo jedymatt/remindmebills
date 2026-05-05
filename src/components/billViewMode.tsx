@@ -22,34 +22,10 @@ interface BillViewModeProps {
   onDelete: () => void;
 }
 
-// Build the InputBillSchema-shaped payload from a bill, swapping in a new groupId.
-// The server schema treats absent fields as undefined; null values fail validation,
-// so optional fields are stripped when null/undefined before sending.
-function buildBillUpdateData(bill: BillEvent, groupId: string | null) {
-  const base = {
-    title: bill.title,
-    groupId,
-    ...(bill.amount != null ? { amount: bill.amount } : {}),
-  };
-  if (bill.type === "single") {
-    return { ...base, type: "single" as const, date: bill.date };
-  }
-  const r = bill.recurrence;
-  const recurrence = {
-    type: r.type,
-    interval: r.interval,
-    dtstart: r.dtstart,
-    ...(r.bymonthday != null ? { bymonthday: r.bymonthday } : {}),
-    ...(r.until != null ? { until: r.until } : {}),
-    ...(r.count != null ? { count: r.count } : {}),
-  };
-  return { ...base, type: "recurring" as const, recurrence };
-}
-
 export function BillViewMode({ bill, onEdit, onDelete }: BillViewModeProps) {
   const { data: groups } = api.group.getAll.useQuery();
   const utils = api.useUtils();
-  const updateBill = api.bill.update.useMutation({
+  const assignGroup = api.bill.assignGroup.useMutation({
     onSuccess: async () => {
       await Promise.all([
         utils.bill.getAll.invalidate(),
@@ -70,10 +46,7 @@ export function BillViewMode({ bill, onEdit, onDelete }: BillViewModeProps) {
   const handleGroupChange = (value: string) => {
     const newGroupId = value === "__none__" ? null : value;
     if (newGroupId === currentGroupId) return;
-    updateBill.mutate({
-      id: bill._id,
-      data: buildBillUpdateData(bill, newGroupId),
-    });
+    assignGroup.mutate({ id: bill._id, groupId: newGroupId });
   };
 
   return (
@@ -118,7 +91,7 @@ export function BillViewMode({ bill, onEdit, onDelete }: BillViewModeProps) {
             <Select
               value={currentGroupId ?? "__none__"}
               onValueChange={handleGroupChange}
-              disabled={updateBill.isPending}
+              disabled={assignGroup.isPending}
             >
               <SelectTrigger className="w-full">
                 <SelectValue>
@@ -152,7 +125,7 @@ export function BillViewMode({ bill, onEdit, onDelete }: BillViewModeProps) {
                 ))}
               </SelectContent>
             </Select>
-            {updateBill.isPending && (
+            {assignGroup.isPending && (
               <Loader2 className="text-muted-foreground size-4 shrink-0 animate-spin" />
             )}
           </div>

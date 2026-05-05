@@ -149,4 +149,29 @@ export const billRouter = createTRPCRouter({
         ...(groupOid !== null ? { groupId: groupOid } : {}),
       });
     }),
+  assignGroup: protectedProcedure
+    .input(z.object({ id: z.string(), groupId: z.string().nullish() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ObjectId.isValid(input.id)) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Bill not found" });
+      }
+
+      const groupOid = await resolveGroupId(ctx, input.groupId);
+      const setOps: Record<string, unknown> =
+        groupOid !== null
+          ? { $set: { groupId: groupOid } }
+          : { $unset: { groupId: "" } };
+
+      const result = await ctx.db.collection<BillEvent>("bills").updateOne(
+        {
+          _id: new ObjectId(input.id),
+          userId: new ObjectId(ctx.session.user.id),
+        },
+        setOps,
+      );
+
+      if (result.matchedCount === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Bill not found" });
+      }
+    }),
 });
