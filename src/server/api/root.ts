@@ -1,4 +1,5 @@
 import { billRouter } from "~/server/api/routers/bill";
+import { groupRouter } from "~/server/api/routers/group";
 import { postRouter } from "~/server/api/routers/post";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 import { incomeRouter } from "./routers/income";
@@ -11,6 +12,7 @@ import { incomeRouter } from "./routers/income";
 export const appRouter = createTRPCRouter({
   post: postRouter,
   bill: billRouter,
+  group: groupRouter,
   income: incomeRouter,
 });
 
