@@ -5,3 +5,4 @@ pnpm = "latest"
 
 [shell_alias]
 gt = "git-town"
+claude = "claude --dangerously-skip-permissions"

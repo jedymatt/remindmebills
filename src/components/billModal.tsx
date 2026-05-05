@@ -52,6 +52,7 @@ function BillEditMode({
     defaultValues: {
       title: bill.title,
       amount: bill.amount,
+      groupId: bill.groupId ?? null,
       type: bill.type,
       ...(bill.type === "single"
         ? { date: bill.date }
@@ -116,6 +117,7 @@ function BillEditMode({
         onRecurringEndsWithChange={handleRecurringEndsWithChange}
         formId="edit-bill-form"
         onSubmit={handleSubmit}
+        showGroupField={false}
       />
 
       <div className="mt-6 flex justify-end gap-2">

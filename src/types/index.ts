@@ -12,6 +12,7 @@ export type BillEvent = {
   title: string;
   amount?: number;
   userId: string;
+  groupId?: string | null;
 } & (Single | Recurring);
 
 // PlaygroundBillData: bill fields without the local id.
@@ -40,4 +41,11 @@ export interface IncomeProfile {
   payFrequency: "weekly" | "fortnightly" | "monthly";
   startDate: Date;
   amount?: number;
+}
+
+export interface Group {
+  _id: string;
+  userId: string;
+  name: string;
+  order: number;
 }

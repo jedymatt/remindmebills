@@ -3,6 +3,8 @@
 import { format } from "date-fns";
 import { useWatch, type UseFormReturn } from "react-hook-form";
 import { z } from "zod";
+import { api } from "~/trpc/react";
+import { colorForOrder } from "~/lib/group-colors";
 import {
   Form,
   FormControl,
@@ -29,6 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 const BaseBillFormValues = z.object({
   title: z.string().min(1, { message: "Title is required" }),
   amount: z.coerce.number<number>().min(0).optional(),
+  groupId: z.string().nullish(),
 });
 
 const SingleBillFormValues = BaseBillFormValues.extend({
@@ -64,6 +67,7 @@ interface BillFormFieldsProps {
   formId: string;
   onSubmit: (data: BillFormValues) => void | Promise<void>;
   titlePlaceholder?: string;
+  showGroupField?: boolean;
 }
 
 export function BillFormFields({
@@ -73,7 +77,13 @@ export function BillFormFields({
   formId,
   onSubmit,
   titlePlaceholder = "Title",
+  showGroupField = true,
 }: BillFormFieldsProps) {
+  const { data: groupsData } = api.group.getAll.useQuery(undefined, {
+    enabled: showGroupField,
+  });
+  const groups = groupsData ?? [];
+
   const [formType, formRecurrenceType] = useWatch({
     name: ["type", "recurrence.type"],
     control: form.control,
@@ -125,6 +135,44 @@ export function BillFormFields({
             </FormItem>
           )}
         />
+        {showGroupField && (
+          <FormField
+            control={form.control}
+            name="groupId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Group (optional)</FormLabel>
+                <Select
+                  onValueChange={(value) =>
+                    field.onChange(value === "__none__" ? null : value)
+                  }
+                  value={field.value ?? "__none__"}
+                >
+                  <FormControl>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="No group" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="__none__">No group</SelectItem>
+                    {groups.map((g) => (
+                      <SelectItem key={g._id} value={g._id}>
+                        <span className="flex items-center gap-2">
+                          <span
+                            className="inline-block size-3 rounded-full"
+                            style={{ backgroundColor: colorForOrder(g.order) }}
+                          />
+                          {g.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
         <Separator />
 
         <Tabs

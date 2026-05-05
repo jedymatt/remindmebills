@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type PropsWithChildren } from "react";
-import { FlaskConical, Receipt } from "lucide-react";
+import { FlaskConical, FolderTree, Receipt } from "lucide-react";
 
 import { useQueryClient } from "@tanstack/react-query";
 import { authClient } from "~/lib/auth-client";
@@ -93,6 +93,17 @@ export function AuthenticatedLayout({ children }: PropsWithChildren) {
                 }`}
               >
                 Dashboard
+              </Link>
+              <Link
+                href="/groups"
+                className={`flex items-center gap-1 text-sm font-medium transition-colors hover:text-foreground ${
+                  pathname === "/groups"
+                    ? "text-foreground"
+                    : "text-muted-foreground"
+                }`}
+              >
+                <FolderTree className="size-3.5" />
+                Groups
               </Link>
               <Link
                 href="/playground"

@@ -6,9 +6,10 @@ import { ChevronDown, ChevronUp, EyeClosedIcon, EyeIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { BillModal } from "~/components/billModal";
 import { getBillsByPayPeriod } from "~/lib/bill-utils";
+import { UNGROUPED_COLOR, colorForOrder } from "~/lib/group-colors";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
-import type { BillEvent } from "~/types";
+import type { BillEvent, Group } from "~/types";
 
 function formatPHP(value: number, signDisplay?: "always") {
   return value.toLocaleString("en-PH", {
@@ -18,15 +19,98 @@ function formatPHP(value: number, signDisplay?: "always") {
   });
 }
 
+type BillRow = BillEvent & { date: Date };
+
+type Section = {
+  group: Group | null;
+  bills: BillRow[];
+};
+
+function buildSections(bills: BillRow[], groups: Group[]): Section[] {
+  const groupIds = new Set(groups.map((g) => g._id));
+  const groupSections: Section[] = groups.map((g) => ({
+    group: g,
+    bills: bills.filter((b) => b.groupId === g._id),
+  }));
+  // Bills with no groupId — and bills referencing a missing group — fall here,
+  // so the sum of section subtotals always equals the card's outgoing total.
+  const ungrouped: Section = {
+    group: null,
+    bills: bills.filter((b) => !b.groupId || !groupIds.has(b.groupId)),
+  };
+  return [...groupSections, ungrouped].filter((s) => s.bills.length > 0);
+}
+
+function BillRowItem({
+  bill,
+  payDate,
+  isExcluded,
+  onClick,
+  onToggleExclude,
+}: {
+  bill: BillRow;
+  payDate: Date;
+  isExcluded: boolean;
+  onClick: () => void;
+  onToggleExclude: () => void;
+}) {
+  return (
+    <li
+      className={cn(
+        "flex cursor-pointer items-center gap-3 py-3 transition-colors hover:bg-muted/50",
+        isEqual(bill.date, payDate) && "text-yellow-700 dark:text-yellow-500",
+        isExcluded && "opacity-40",
+      )}
+      onClick={onClick}
+    >
+      <button
+        type="button"
+        className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleExclude();
+        }}
+      >
+        {isExcluded ? (
+          <EyeClosedIcon className="size-4" />
+        ) : (
+          <EyeIcon className="size-4" />
+        )}
+      </button>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium">{bill.title}</div>
+        {!isExcluded && (
+          <div className="text-muted-foreground text-xs">
+            Due {formatDate(bill.date, "MMM d")}
+          </div>
+        )}
+      </div>
+      {!isExcluded && (
+        <span className="shrink-0 text-sm font-medium tabular-nums">
+          {bill.amount != null ? (
+            formatPHP(bill.amount)
+          ) : (
+            <span className="text-muted-foreground text-xs font-normal">
+              —
+            </span>
+          )}
+        </span>
+      )}
+    </li>
+  );
+}
+
 function BillListCard({
   bills,
+  groups,
   payDate,
   after,
   isCurrent,
   ingoing,
   onBillClick,
 }: {
-  bills: (BillEvent & { date: Date })[];
+  bills: BillRow[];
+  groups: Group[];
   payDate: Date;
   after: Date | null;
   isCurrent: boolean;
@@ -35,6 +119,11 @@ function BillListCard({
 }) {
   const [excludedBills, setExcludedBills] = useState<string[]>([]);
   const [showBreakdown, setShowBreakdown] = useState(false);
+
+  const sections = useMemo(
+    () => buildSections(bills, groups),
+    [bills, groups],
+  );
 
   const outgoing = useMemo(
     () =>
@@ -54,6 +143,12 @@ function BillListCard({
         : [...prev, billId],
     );
   };
+
+  const subtotalFor = (sectionBills: BillRow[]) =>
+    sumBy(
+      sectionBills.filter((b) => !excludedBills.includes(b._id)),
+      (b) => b.amount ?? 0,
+    );
 
   return (
     <div
@@ -87,66 +182,53 @@ function BillListCard({
         )}
       </div>
 
-      {/* Bill list */}
+      {/* Sections */}
       <div className="flex-1 px-5 py-2">
         {bills.length === 0 ? (
           <p className="text-muted-foreground py-6 text-center text-sm">
             No bills this period
           </p>
         ) : (
-          <ul className="divide-y">
-            {bills.map((bill) => {
-              const isExcluded = excludedBills.includes(bill._id);
+          <div className="space-y-3">
+            {sections.map((section) => {
+              const subtotal = subtotalFor(section.bills);
+              const swatchColor = section.group
+                ? colorForOrder(section.group.order)
+                : UNGROUPED_COLOR;
+              const label = section.group ? section.group.name : "Ungrouped";
               return (
-                <li
-                  key={bill._id}
-                  className={cn(
-                    "flex items-center gap-3 py-3 cursor-pointer hover:bg-muted/50 -mx-5 px-5 transition-colors",
-                    isEqual(bill.date, payDate) &&
-                      "text-yellow-700 dark:text-yellow-500",
-                    isExcluded && "opacity-40",
-                  )}
-                  onClick={() => onBillClick(bill._id)}
+                <div
+                  key={section.group?._id ?? "__ungrouped__"}
+                  className="border-l-[3px] pl-3"
+                  style={{ borderLeftColor: swatchColor }}
                 >
-                  <button
-                    type="button"
-                    className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleExclude(bill._id);
-                    }}
-                  >
-                    {isExcluded ? (
-                      <EyeClosedIcon className="size-4" />
-                    ) : (
-                      <EyeIcon className="size-4" />
-                    )}
-                  </button>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">
-                      {bill.title}
-                    </div>
-                    {!isExcluded && (
-                      <div className="text-muted-foreground text-xs">
-                        Due {formatDate(bill.date, "MMM d")}
-                      </div>
-                    )}
-                  </div>
-                  {!isExcluded && (
-                    <span className="shrink-0 text-sm font-medium tabular-nums">
-                      {bill.amount != null ? (
-                        formatPHP(bill.amount)
-                      ) : (
-                        <span className="text-muted-foreground text-xs font-normal">
-                          —
-                        </span>
-                      )}
+                  <div className="flex items-center justify-between pt-1">
+                    <span
+                      className="text-sm font-medium"
+                      style={{ color: swatchColor }}
+                    >
+                      {label}
                     </span>
-                  )}
-                </li>
+                    <span className="text-muted-foreground text-xs tabular-nums">
+                      {formatPHP(subtotal)}
+                    </span>
+                  </div>
+                  <ul className="divide-y">
+                    {section.bills.map((bill) => (
+                      <BillRowItem
+                        key={bill._id}
+                        bill={bill}
+                        payDate={payDate}
+                        isExcluded={excludedBills.includes(bill._id)}
+                        onClick={() => onBillClick(bill._id)}
+                        onToggleExclude={() => toggleExclude(bill._id)}
+                      />
+                    ))}
+                  </ul>
+                </div>
               );
             })}
-          </ul>
+          </div>
         )}
       </div>
 
@@ -204,10 +286,11 @@ function BillListCard({
 export function BillList() {
   const { data: bills } = api.bill.getAll.useQuery();
   const { data: incomeProfile } = api.income.getIncomeProfile.useQuery();
+  const { data: groups } = api.group.getAll.useQuery();
   const [selectedBillId, setSelectedBillId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  if (!incomeProfile || !bills) return null;
+  if (!incomeProfile || !bills || !groups) return null;
 
   const billsInPayPeriod = getBillsByPayPeriod(bills, incomeProfile);
   const ingoing = incomeProfile.amount ?? 0;
@@ -225,6 +308,7 @@ export function BillList() {
             key={index}
             payDate={payDate}
             bills={bills}
+            groups={groups}
             after={after}
             isCurrent={index === 0}
             ingoing={ingoing}
