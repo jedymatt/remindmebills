@@ -162,6 +162,7 @@ function PlaygroundBillEditMode({
         onRecurringEndsWithChange={handleRecurringEndsWithChange}
         formId="edit-playground-bill-form"
         onSubmit={handleSubmit}
+        showGroupField={false}
       />
 
       <div className="mt-6 flex justify-end gap-2">

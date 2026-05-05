@@ -79,6 +79,7 @@ export function PlaygroundBillFormDialog({
           formId="playground-bill-form"
           onSubmit={handleSubmit}
           titlePlaceholder="e.g., Car Loan"
+          showGroupField={false}
         />
 
         <div className="flex justify-end gap-2">
