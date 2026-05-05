@@ -24,6 +24,7 @@ export function CreateBillForm() {
     defaultValues: {
       title: "",
       type: "single",
+      groupId: null,
     },
   });
   const utils = api.useUtils();

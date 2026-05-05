@@ -52,6 +52,7 @@ function BillEditMode({
     defaultValues: {
       title: bill.title,
       amount: bill.amount,
+      groupId: bill.groupId ?? null,
       type: bill.type,
       ...(bill.type === "single"
         ? { date: bill.date }
