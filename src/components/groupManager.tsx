@@ -138,12 +138,14 @@ function GroupFormDialog({
 
 function SortableRow({
   group,
+  index,
   billCount,
   disabled,
   onEdit,
   onDelete,
 }: {
   group: Group;
+  index: number;
   billCount: number;
   disabled: boolean;
   onEdit: () => void;
@@ -182,7 +184,7 @@ function SortableRow({
       </button>
       <span
         className="inline-block size-4 rounded-full"
-        style={{ backgroundColor: colorForOrder(group.order) }}
+        style={{ backgroundColor: colorForOrder(index) }}
       />
       <span className="flex-1 truncate font-medium">{group.name}</span>
       <span className="text-muted-foreground text-xs">
@@ -245,6 +247,7 @@ export function GroupManager() {
       await Promise.all([
         utils.group.getAll.invalidate(),
         utils.bill.getAll.invalidate(),
+        utils.bill.getById.invalidate(),
       ]);
       toast.success("Group deleted");
       setDeleting(null);
@@ -319,10 +322,11 @@ export function GroupManager() {
               strategy={verticalListSortingStrategy}
             >
               <ul className="space-y-2">
-                {orderedGroups.map((g) => (
+                {orderedGroups.map((g, i) => (
                   <SortableRow
                     key={g._id}
                     group={g}
+                    index={i}
                     billCount={billCountByGroup(g._id)}
                     disabled={reorderMut.isPending}
                     onEdit={() => setEditing(g)}
