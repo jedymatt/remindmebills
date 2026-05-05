@@ -57,7 +57,7 @@ function BillRowItem({
   return (
     <li
       className={cn(
-        "flex cursor-pointer items-center gap-3 px-5 py-3 transition-colors hover:bg-muted/50 -mx-5",
+        "flex cursor-pointer items-center gap-3 py-3 transition-colors hover:bg-muted/50",
         isEqual(bill.date, payDate) && "text-yellow-700 dark:text-yellow-500",
         isExcluded && "opacity-40",
       )}
@@ -197,17 +197,18 @@ function BillListCard({
                 : UNGROUPED_COLOR;
               const label = section.group ? section.group.name : "Ungrouped";
               return (
-                <div key={section.group?._id ?? "__ungrouped__"}>
+                <div
+                  key={section.group?._id ?? "__ungrouped__"}
+                  className="border-l-[3px] pl-3"
+                  style={{ borderLeftColor: swatchColor }}
+                >
                   <div className="flex items-center justify-between pt-1">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="inline-block size-2.5 rounded-full"
-                        style={{ backgroundColor: swatchColor }}
-                      />
-                      <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-                        {label}
-                      </span>
-                    </div>
+                    <span
+                      className="text-sm font-medium"
+                      style={{ color: swatchColor }}
+                    >
+                      {label}
+                    </span>
                     <span className="text-muted-foreground text-xs tabular-nums">
                       {formatPHP(subtotal)}
                     </span>
