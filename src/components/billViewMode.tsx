@@ -23,15 +23,27 @@ interface BillViewModeProps {
 }
 
 // Build the InputBillSchema-shaped payload from a bill, swapping in a new groupId.
+// The server schema treats absent fields as undefined; null values fail validation,
+// so optional fields are stripped when null/undefined before sending.
 function buildBillUpdateData(bill: BillEvent, groupId: string | null) {
   const base = {
     title: bill.title,
-    amount: bill.amount,
     groupId,
+    ...(bill.amount != null ? { amount: bill.amount } : {}),
   };
-  return bill.type === "single"
-    ? { ...base, type: "single" as const, date: bill.date }
-    : { ...base, type: "recurring" as const, recurrence: bill.recurrence };
+  if (bill.type === "single") {
+    return { ...base, type: "single" as const, date: bill.date };
+  }
+  const r = bill.recurrence;
+  const recurrence = {
+    type: r.type,
+    interval: r.interval,
+    dtstart: r.dtstart,
+    ...(r.bymonthday != null ? { bymonthday: r.bymonthday } : {}),
+    ...(r.until != null ? { until: r.until } : {}),
+    ...(r.count != null ? { count: r.count } : {}),
+  };
+  return { ...base, type: "recurring" as const, recurrence };
 }
 
 export function BillViewMode({ bill, onEdit, onDelete }: BillViewModeProps) {
