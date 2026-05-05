@@ -54,7 +54,7 @@ Existing bills are untouched and treated as ungrouped.
 ### Schema/type changes
 
 - New file `src/schemas/group.ts` with Zod schemas: `CreateGroupInput`, `UpdateGroupInput`, `ReorderGroupsInput`.
-- `~/types` adds an exported `Group` type and extends `BillEvent` with `groupId?: string | null` (serialised to hex string at the API boundary, matching the existing `_id`/`userId` pattern).
+- `~/types` adds an exported `Group` type and extends `BillEvent` with `groupId?: string | null` (serialized to hex string at the API boundary, matching the existing `_id`/`userId` pattern).
 - `BillFormValuesSchema` (in `billFormFields.tsx`) extends both `single` and `recurring` variants with `groupId: z.string().nullish()`.
 
 ## Color derivation
@@ -87,7 +87,7 @@ Transactions are not used because MongoDB transactions require a replica set, wh
   2. Verifies the group belongs to the same user via a single `groups.findOne({ _id, userId })`.
   3. On either failure: throws `BAD_REQUEST`.
 - When `groupId` is `null` or `undefined` it is stored as `null` (or unset). Existing bills (with the field absent) are treated identically to `null`.
-- `getAll` and `getById` serialise `groupId` to a hex string when present; absent or null `groupId` is returned as `null`.
+- `getAll` and `getById` serialize `groupId` to a hex string when present; absent or null `groupId` is returned as `null`.
 
 ### Client-side cache invalidation
 
@@ -175,7 +175,7 @@ Display the group as a labeled field ("Group: <swatch> <name>") when present. Om
 | File | Change |
 |---|---|
 | `src/server/api/routers/group.ts` | New: `getAll`, `create`, `update`, `reorder`, `delete`. |
-| `src/server/api/routers/bill.ts` | Add `groupId` to input schemas, validate ownership on create/update, serialise on read. |
+| `src/server/api/routers/bill.ts` | Add `groupId` to input schemas, validate ownership on create/update, serialize on read. |
 | `src/server/api/root.ts` | Register `groupRouter`. |
 | `src/schemas/group.ts` | New: input Zod schemas. |
 | `src/types/index.ts` | Export `Group`; extend `BillEvent` with `groupId`. |
