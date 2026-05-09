@@ -60,10 +60,10 @@ function BillEditMode({
             recurrence: {
               type: bill.recurrence.type,
               interval: bill.recurrence.interval,
-              bymonthday: bill.recurrence.bymonthday,
+              bymonthday: bill.recurrence.bymonthday ?? undefined,
               dtstart: bill.recurrence.dtstart,
-              until: bill.recurrence.until,
-              count: bill.recurrence.count,
+              until: bill.recurrence.until ?? undefined,
+              count: bill.recurrence.count ?? undefined,
             },
           }),
     } as BillFormValues,

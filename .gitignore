@@ -50,3 +50,6 @@ yarn-error.log*
 
 # superpowers
 .superpowers
+
+# playwright
+.playwright-mcp
