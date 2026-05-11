@@ -3,9 +3,9 @@
 import { formatDate, isEqual, subDays } from "date-fns";
 import { sumBy } from "lodash";
 import { EyeClosedIcon, EyeIcon, Sparkles } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BillModal } from "~/components/billModal";
-import { getBillsByPayPeriod } from "~/lib/bill-utils";
+import { getPayPeriodsByCount } from "~/lib/bill-utils";
 import { UNGROUPED_COLOR, colorForOrder } from "~/lib/group-colors";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
@@ -291,16 +291,40 @@ function BillListCard({
   );
 }
 
+const PERIODS_INITIAL = 9;
+const PERIODS_PAGE = 9;
+
 export function BillList() {
   const { data: bills } = api.bill.getAll.useQuery();
   const { data: incomeProfile } = api.income.getIncomeProfile.useQuery();
   const { data: groups } = api.group.getAll.useQuery();
   const [selectedBillId, setSelectedBillId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PERIODS_INITIAL);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  const billsInPayPeriod = useMemo(() => {
+    if (!bills || !incomeProfile) return [];
+    return getPayPeriodsByCount(bills, incomeProfile, visibleCount);
+  }, [bills, incomeProfile, visibleCount]);
+
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setVisibleCount((c) => c + PERIODS_PAGE);
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [billsInPayPeriod.length]);
 
   if (!incomeProfile || !bills || !groups) return null;
 
-  const billsInPayPeriod = getBillsByPayPeriod(bills, incomeProfile);
   const ingoing = incomeProfile.amount ?? 0;
 
   const handleBillClick = (billId: string) => {
@@ -324,6 +348,8 @@ export function BillList() {
           />
         ))}
       </div>
+
+      <div ref={sentinelRef} aria-hidden className="h-1 w-full" />
 
       <BillModal
         billId={selectedBillId}

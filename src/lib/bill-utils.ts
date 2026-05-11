@@ -89,3 +89,28 @@ export function getBillsByPayPeriod(
     };
   });
 }
+
+export function getPayPeriodsByCount(
+  bills: BillEvent[],
+  incomeProfile: IncomeProfile,
+  count: number,
+) {
+  const payRule = createPayRule(incomeProfile);
+  const payDates: Date[] = [];
+  let currentPay = payRule.before(new Date(), true)!;
+  for (let i = 0; i < count; i++) {
+    payDates.push(currentPay);
+    currentPay = payRule.after(currentPay)!;
+  }
+
+  return payDates.map((payDate) => {
+    const nextPayDate = payRule.after(payDate)!;
+    const periodBills = computeBillsInPeriod(bills, payDate, nextPayDate);
+
+    return {
+      payDate,
+      bills: periodBills,
+      after: payRule.after(payDate),
+    };
+  });
+}
