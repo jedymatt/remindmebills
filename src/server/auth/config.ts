@@ -9,10 +9,10 @@ export const authConfig = {
   database: mongodbAdapter(db),
   baseURL: {
     allowedHosts: [
+      "localhost:3000",
       "remindmebills.com",
       "remindmebills.vercel.app",
       "remindmebills-*-jedymatt-personal.vercel.app/",
-      "localhost:3000",
     ],
     protocol: env.NODE_ENV === "development" ? "http" : "https",
   },
