@@ -7,7 +7,6 @@ import { db } from "~/server/db";
 
 export const authConfig = {
   database: mongodbAdapter(db),
-  dynamicBaseUrl: !env.BETTER_AUTH_URL,
   socialProviders: {
     google: {
       clientId: env.AUTH_GOOGLE_ID,
