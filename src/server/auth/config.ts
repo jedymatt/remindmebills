@@ -26,7 +26,7 @@ export const authConfig = {
     nextCookies(),
     anonymous(),
     oAuthProxy({
-      productionURL: "https://remindmebills.com",
+      productionURL: "https://www.remindmebills.com",
     }),
   ],
   account: {
