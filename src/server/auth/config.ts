@@ -12,7 +12,7 @@ export const authConfig = {
       "localhost:3000",
       "remindmebills.com",
       "remindmebills.vercel.app",
-      "remindmebills-*-jedymatt-personal.vercel.app/",
+      "remindmebills-*-jedymatt-personal.vercel.app",
     ],
     protocol: env.NODE_ENV === "development" ? "http" : "https",
   },
