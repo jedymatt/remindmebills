@@ -1,7 +1,7 @@
 import type { BetterAuthOptions } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
 import { nextCookies } from "better-auth/next-js";
-import { anonymous, oAuthProxy } from "better-auth/plugins";
+import { anonymous } from "better-auth/plugins";
 import { env } from "~/env";
 import { db } from "~/server/db";
 
@@ -25,9 +25,6 @@ export const authConfig = {
   plugins: [
     nextCookies(),
     anonymous(),
-    oAuthProxy({
-      productionURL: "https://www.remindmebills.com",
-    }),
   ],
   account: {
     modelName: "accounts",
