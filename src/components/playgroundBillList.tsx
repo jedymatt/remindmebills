@@ -23,6 +23,8 @@ interface PlaygroundBillListCardProps {
   isCurrent: boolean;
   ingoing: number;
   onBillClick: (billId: string) => void;
+  highlightedBillIds: Set<string>;
+  removingBillIds: Set<string>;
 }
 
 function PlaygroundBillListCard({
@@ -32,6 +34,8 @@ function PlaygroundBillListCard({
   isCurrent,
   ingoing,
   onBillClick,
+  highlightedBillIds,
+  removingBillIds,
 }: PlaygroundBillListCardProps) {
   const [excludedBills, setExcludedBills] = useState<string[]>([]);
   const [showBreakdown, setShowBreakdown] = useState(false);
@@ -97,17 +101,25 @@ function PlaygroundBillListCard({
           <ul className="divide-y">
             {bills.map((bill) => {
               const isExcluded = excludedBills.includes(bill.id);
+              const isHighlighted = highlightedBillIds.has(bill.id);
+              const isRemoving = removingBillIds.has(bill.id);
               return (
                 <li
                   key={bill.id}
                   className={cn(
-                    "hover:bg-muted/50 -mx-5 flex cursor-pointer items-center gap-3 px-5 py-3 transition-colors",
+                    "hover:bg-muted/50 relative -mx-5 flex cursor-pointer items-center gap-3 px-5 py-3 transition-colors",
                     isEqual(bill.date, payDate) &&
                       "text-yellow-700 dark:text-yellow-500",
                     isExcluded && "opacity-40",
                   )}
                   onClick={() => onBillClick(bill.id)}
                 >
+                  {isHighlighted && (
+                    <div className="pointer-events-none absolute inset-0 animate-glow-add" />
+                  )}
+                  {isRemoving && (
+                    <div className="pointer-events-none absolute inset-0 animate-glow-remove" />
+                  )}
                   <button
                     type="button"
                     className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
@@ -205,12 +217,16 @@ interface PlaygroundBillListProps {
   bills: PlaygroundBill[];
   incomeProfile: IncomeProfile;
   onBillClick: (billId: string) => void;
+  highlightedBillIds: Set<string>;
+  removingBillIds: Set<string>;
 }
 
 export function PlaygroundBillList({
   bills,
   incomeProfile,
   onBillClick,
+  highlightedBillIds,
+  removingBillIds,
 }: PlaygroundBillListProps) {
   // Convert PlaygroundBill[] to BillEvent[] shape for getBillsByPayPeriod
   const billsAsBillEvent = bills.map((bill) => ({
@@ -241,6 +257,8 @@ export function PlaygroundBillList({
           isCurrent={index === 0}
           ingoing={ingoing}
           onBillClick={onBillClick}
+          highlightedBillIds={highlightedBillIds}
+          removingBillIds={removingBillIds}
         />
       ))}
     </div>

@@ -17,6 +17,12 @@ export function PlaygroundWorkspace() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [selectedBill, setSelectedBill] = useState<PlaygroundBill | null>(null);
   const [billModalOpen, setBillModalOpen] = useState(false);
+  const [highlightedBillIds, setHighlightedBillIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [removingBillIds, setRemovingBillIds] = useState<Set<string>>(
+    new Set(),
+  );
 
   if (!incomeProfile) return null;
 
@@ -32,6 +38,14 @@ export function PlaygroundWorkspace() {
 
   const handleAddBill = (bill: PlaygroundBill) => {
     dispatch({ type: "ADD_BILL", bill });
+    setHighlightedBillIds((prev) => new Set([...prev, bill.id]));
+    setTimeout(() => {
+      setHighlightedBillIds((prev) => {
+        const next = new Set(prev);
+        next.delete(bill.id);
+        return next;
+      });
+    }, 1500);
   };
 
   const handleBillClick = (billId: string) => {
@@ -49,7 +63,15 @@ export function PlaygroundWorkspace() {
   };
 
   const handleDeleteBill = (id: string) => {
-    dispatch({ type: "DELETE_BILL", id });
+    setRemovingBillIds((prev) => new Set([...prev, id]));
+    setTimeout(() => {
+      dispatch({ type: "DELETE_BILL", id });
+      setRemovingBillIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }, 800);
   };
 
   const handleReset = () => {
@@ -57,6 +79,8 @@ export function PlaygroundWorkspace() {
     // Clear local UI state so a stale modal can't persist after reset
     setSelectedBill(null);
     setBillModalOpen(false);
+    setHighlightedBillIds(new Set());
+    setRemovingBillIds(new Set());
   };
 
   const handleBillModalOpenChange = (open: boolean) => {
@@ -85,6 +109,8 @@ export function PlaygroundWorkspace() {
           bills={bills}
           incomeProfile={incomeProfile}
           onBillClick={handleBillClick}
+          highlightedBillIds={highlightedBillIds}
+          removingBillIds={removingBillIds}
         />
       ) : (
         <div className="flex flex-col items-center rounded-lg border border-dashed py-12">
