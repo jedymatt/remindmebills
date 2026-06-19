@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type PropsWithChildren } from "react";
-import { FlaskConical, FolderTree, Receipt } from "lucide-react";
+import {
+  FlaskConical,
+  FolderTree,
+  LayoutDashboard,
+  Menu,
+  Receipt,
+  type LucideIcon,
+} from "lucide-react";
 
 import { useQueryClient } from "@tanstack/react-query";
 import { authClient } from "~/lib/auth-client";
@@ -17,6 +24,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "./ui/sheet";
 
 function UserNav() {
   const router = useRouter();
@@ -71,8 +85,15 @@ function UserNav() {
   );
 }
 
+const navLinks: Array<{ href: string; label: string; icon: LucideIcon }> = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/groups", label: "Groups", icon: FolderTree },
+  { href: "/playground", label: "Playground", icon: FlaskConical },
+];
+
 export function AuthenticatedLayout({ children }: PropsWithChildren) {
   const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -84,41 +105,62 @@ export function AuthenticatedLayout({ children }: PropsWithChildren) {
               <span>Remind Me Bills</span>
             </Link>
             <nav className="hidden items-center gap-4 sm:flex">
-              <Link
-                href="/dashboard"
-                className={`text-sm font-medium transition-colors hover:text-foreground ${
-                  pathname === "/dashboard"
-                    ? "text-foreground"
-                    : "text-muted-foreground"
-                }`}
-              >
-                Dashboard
-              </Link>
-              <Link
-                href="/groups"
-                className={`flex items-center gap-1 text-sm font-medium transition-colors hover:text-foreground ${
-                  pathname === "/groups"
-                    ? "text-foreground"
-                    : "text-muted-foreground"
-                }`}
-              >
-                <FolderTree className="size-3.5" />
-                Groups
-              </Link>
-              <Link
-                href="/playground"
-                className={`flex items-center gap-1 text-sm font-medium transition-colors hover:text-foreground ${
-                  pathname === "/playground"
-                    ? "text-foreground"
-                    : "text-muted-foreground"
-                }`}
-              >
-                <FlaskConical className="size-3.5" />
-                Playground
-              </Link>
+              {navLinks.map(({ href, label, icon: Icon }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`flex items-center gap-1 text-sm font-medium transition-colors hover:text-foreground ${
+                    pathname === href
+                      ? "text-foreground"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  {Icon && <Icon className="size-3.5" />}
+                  {label}
+                </Link>
+              ))}
             </nav>
           </div>
-          <UserNav />
+          <div className="flex items-center gap-2">
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="sm:hidden"
+                  aria-label="Open navigation menu"
+                >
+                  <Menu className="size-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left">
+                <SheetHeader>
+                  <SheetTitle className="flex items-center gap-2">
+                    <Receipt className="size-5" />
+                    Remind Me Bills
+                  </SheetTitle>
+                </SheetHeader>
+                <nav className="flex flex-col gap-1 px-6">
+                  {navLinks.map(({ href, label, icon: Icon }) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground ${
+                        pathname === href
+                          ? "bg-accent text-accent-foreground"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {Icon && <Icon className="size-4" />}
+                      {label}
+                    </Link>
+                  ))}
+                </nav>
+              </SheetContent>
+            </Sheet>
+            <UserNav />
+          </div>
         </div>
       </header>
       <main className="flex-1">{children}</main>
