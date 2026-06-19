@@ -8,7 +8,11 @@ import { db } from "~/server/db";
 export const authConfig = {
   database: mongodbAdapter(db),
   baseURL: {
-    allowedHosts: ["remindmebills.com", "*.vercel.app", "localhost:3000"],
+    allowedHosts: [
+      "remindmebills.com",
+      "https://remindmebills-*-jedymatt-personal.vercel.app/",
+      "localhost:3000",
+    ],
     protocol: env.NODE_ENV === "development" ? "http" : "https",
   },
   socialProviders: {
