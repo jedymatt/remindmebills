@@ -10,7 +10,8 @@ export const authConfig = {
   baseURL: {
     allowedHosts: [
       "remindmebills.com",
-      "https://remindmebills-*-jedymatt-personal.vercel.app/",
+      "remindmebills.vercel.app",
+      "remindmebills-*-jedymatt-personal.vercel.app/",
       "localhost:3000",
     ],
     protocol: env.NODE_ENV === "development" ? "http" : "https",
