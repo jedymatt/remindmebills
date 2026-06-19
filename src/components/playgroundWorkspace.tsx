@@ -39,13 +39,6 @@ export function PlaygroundWorkspace() {
   const handleAddBill = (bill: PlaygroundBill) => {
     dispatch({ type: "ADD_BILL", bill });
     setHighlightedBillIds((prev) => new Set([...prev, bill.id]));
-    setTimeout(() => {
-      setHighlightedBillIds((prev) => {
-        const next = new Set(prev);
-        next.delete(bill.id);
-        return next;
-      });
-    }, 1500);
   };
 
   const handleBillClick = (billId: string) => {
@@ -64,14 +57,6 @@ export function PlaygroundWorkspace() {
 
   const handleDeleteBill = (id: string) => {
     setRemovingBillIds((prev) => new Set([...prev, id]));
-    setTimeout(() => {
-      dispatch({ type: "DELETE_BILL", id });
-      setRemovingBillIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-    }, 800);
   };
 
   const handleReset = () => {
