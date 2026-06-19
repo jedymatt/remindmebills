@@ -114,11 +114,14 @@ function PlaygroundBillListCard({
                   )}
                   onClick={() => onBillClick(bill.id)}
                 >
-                  {isHighlighted && (
-                    <div className="pointer-events-none absolute inset-0 animate-glow-add" />
-                  )}
-                  {isRemoving && (
-                    <div className="pointer-events-none absolute inset-0 animate-glow-remove" />
+                  {(isHighlighted || isRemoving) && (
+                    <div
+                      className={cn(
+                        "pointer-events-none absolute inset-0",
+                        isHighlighted && "animate-glow-add",
+                        isRemoving && "animate-glow-remove",
+                      )}
+                    />
                   )}
                   <button
                     type="button"
