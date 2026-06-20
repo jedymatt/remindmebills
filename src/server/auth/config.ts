@@ -27,9 +27,9 @@ export const authConfig = {
   plugins: [
     nextCookies(),
     anonymous(),
-    oAuthProxy(
+    oAuthProxy({
       productionURL: "https://www.remindmebills.com"
-    ),
+    }),
   ],
   account: {
     modelName: "accounts",
