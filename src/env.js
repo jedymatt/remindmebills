@@ -12,7 +12,7 @@ export const env = createEnv({
       process.env.NODE_ENV === "production"
         ? z.string()
         : z.string().optional(),
-    BETTER_AUTH_URL: z.url(),
+    BETTER_AUTH_URL: z.url().optional(),
     AUTH_GOOGLE_ID: z.string(),
     AUTH_GOOGLE_SECRET: z.string(),
     NODE_ENV: z
