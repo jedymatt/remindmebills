@@ -1,6 +1,6 @@
 "use client";
 
-import { formatDate, isEqual, subDays } from "date-fns";
+import { formatDate, isSameDay, subDays } from "date-fns";
 import { sumBy } from "lodash";
 import { ChevronDown, ChevronUp, EyeClosedIcon, EyeIcon } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -108,7 +108,7 @@ function PlaygroundBillListCard({
                   key={bill.id}
                   className={cn(
                     "hover:bg-muted/50 relative -mx-5 flex cursor-pointer items-center gap-3 px-5 py-3 transition-colors",
-                    isEqual(bill.date, payDate) &&
+                    isSameDay(bill.date, payDate) &&
                       "text-yellow-700 dark:text-yellow-500",
                     isExcluded && "opacity-40",
                   )}

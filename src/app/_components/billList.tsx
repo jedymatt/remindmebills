@@ -1,6 +1,6 @@
 "use client";
 
-import { formatDate, isEqual, subDays } from "date-fns";
+import { formatDate, isSameDay, subDays } from "date-fns";
 import { sumBy } from "lodash";
 import { EyeClosedIcon, EyeIcon, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -54,7 +54,7 @@ function BillRowItem({
   onClick: () => void;
   onToggleExclude: () => void;
 }) {
-  const isDue = isEqual(bill.date, payDate);
+  const isDue = isSameDay(bill.date, payDate);
 
   return (
     <li

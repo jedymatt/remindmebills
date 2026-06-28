@@ -7,7 +7,7 @@ import {
   PiggyBank,
   Wallet,
 } from "lucide-react";
-import { formatDate } from "date-fns";
+import { formatDate, startOfDay } from "date-fns";
 import { sumBy } from "lodash";
 import { Card, CardContent } from "~/components/ui/card";
 import { createPayRule, computeBillsInPeriod } from "~/lib/bill-utils";
@@ -37,11 +37,11 @@ export function FinancialSummaryCards({
 
     const periodBills = computeBillsInPeriod(bills, currentPay, nextPayDate);
 
-    // Find the nearest upcoming bill (today or future)
-    const now = new Date();
-    const upcoming = periodBills.find(
-      (b) => b.date >= now,
-    );
+    // Find the nearest upcoming bill (today or future). Compare on day
+    // granularity: bill dates are at midnight, so `b.date >= new Date()` would
+    // drop a bill due today once the wall clock passes midnight.
+    const today = startOfDay(new Date());
+    const upcoming = periodBills.find((b) => b.date >= today);
 
     return { currentPeriodBills: periodBills, nextBill: upcoming ?? null };
   }, [incomeProfile, bills]);
