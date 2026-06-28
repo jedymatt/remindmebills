@@ -1,11 +1,12 @@
 "use client";
 
-import { formatDate, isSameDay, subDays } from "date-fns";
+import { isSameDay, subDays } from "date-fns";
 import { sumBy } from "lodash";
 import { EyeClosedIcon, EyeIcon, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BillModal } from "~/components/billModal";
 import { getPayPeriodsByCount } from "~/lib/bill-utils";
+import { formatUtcDate } from "~/lib/date-utils";
 import { UNGROUPED_COLOR, colorForOrder } from "~/lib/group-colors";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
@@ -101,7 +102,7 @@ function BillRowItem({
             {isDue && (
               <span className="mr-1 inline-block size-2 rounded-full bg-amber-400 dark:bg-amber-500 align-middle opacity-80" />
             )}
-            {formatDate(bill.date, "MMM d")}
+            {formatUtcDate(bill.date, "MMM d")}
           </div>
         )}
       </div>
@@ -170,8 +171,8 @@ function BillListCard({
     );
 
   const dateLabel = after
-    ? `${formatDate(payDate, "MMM d")} – ${formatDate(subDays(after, 1), "MMM d, yyyy")}`
-    : formatDate(payDate, "MMM d, yyyy");
+    ? `${formatUtcDate(payDate, "MMM d")} – ${formatUtcDate(subDays(after, 1), "MMM d, yyyy")}`
+    : formatUtcDate(payDate, "MMM d, yyyy");
 
   return (
     <div

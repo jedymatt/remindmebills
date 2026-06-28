@@ -30,15 +30,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
+import { utcDateOnlyToLocal } from "~/lib/date-utils";
 import { api } from "~/trpc/react";
 import { DatePicker } from "./datePicker";
 import type { IncomeProfile } from "~/types";
 
 const EditIncomeProfileSchema = z.object({
   payFrequency: z.enum(["weekly", "fortnightly", "monthly"]),
-  startDate: z.coerce.date<Date>().refine((val) => !isFuture(val), {
-    message: "No future dates allowed",
-  }),
+  // startDate is canonical UTC midnight; compare its calendar day (not the raw
+  // instant) so picking "today" is never treated as future in +offset zones.
+  startDate: z.coerce
+    .date<Date>()
+    .refine((val) => !isFuture(utcDateOnlyToLocal(val)), {
+      message: "No future dates allowed",
+    }),
   amount: z.number().min(0, "Amount must be 0 or more").optional(),
 });
 

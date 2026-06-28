@@ -1,9 +1,9 @@
 "use client";
 
-import { format } from "date-fns";
 import { useWatch, type UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 import { api } from "~/trpc/react";
+import { formatUtcDate } from "~/lib/date-utils";
 import { colorForOrder } from "~/lib/group-colors";
 import {
   Form,
@@ -198,7 +198,7 @@ export function BillFormFields({
                       placeholder="Date"
                       {...field}
                       value={
-                        field.value ? format(field.value, "yyyy-MM-dd") : ""
+                        field.value ? formatUtcDate(field.value, "yyyy-MM-dd") : ""
                       }
                     />
                   </FormControl>
@@ -269,7 +269,7 @@ export function BillFormFields({
                       placeholder="Date Start"
                       {...field}
                       value={
-                        field.value ? format(field.value, "yyyy-MM-dd") : ""
+                        field.value ? formatUtcDate(field.value, "yyyy-MM-dd") : ""
                       }
                     />
                   </FormControl>
@@ -336,7 +336,7 @@ export function BillFormFields({
                           disabled={recurringEndsWith !== "until"}
                           value={
                             field.value
-                              ? format(field.value, "yyyy-MM-dd")
+                              ? formatUtcDate(field.value, "yyyy-MM-dd")
                               : ""
                           }
                         />

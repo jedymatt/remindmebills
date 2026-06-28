@@ -1,10 +1,11 @@
 "use client";
 
-import { formatDate, isSameDay, subDays } from "date-fns";
+import { isSameDay, subDays } from "date-fns";
 import { sumBy } from "lodash";
 import { ChevronDown, ChevronUp, EyeClosedIcon, EyeIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { getBillsByPayPeriod } from "~/lib/bill-utils";
+import { formatUtcDate } from "~/lib/date-utils";
 import { cn } from "~/lib/utils";
 import type { BillEvent, IncomeProfile, PlaygroundBill } from "~/types";
 
@@ -77,8 +78,8 @@ function PlaygroundBillListCard({
       >
         <div>
           <div className="text-sm font-semibold">
-            {formatDate(payDate, "MMM d")}
-            {after && <> – {formatDate(subDays(after, 1), "MMM d, yyyy")}</>}
+            {formatUtcDate(payDate, "MMM d")}
+            {after && <> – {formatUtcDate(subDays(after, 1), "MMM d, yyyy")}</>}
           </div>
           <div className="text-muted-foreground mt-0.5 text-xs">
             {bills.length} {bills.length === 1 ? "bill" : "bills"}
@@ -143,7 +144,7 @@ function PlaygroundBillListCard({
                     </div>
                     {!isExcluded && (
                       <div className="text-muted-foreground text-xs">
-                        Due {formatDate(bill.date, "MMM d")}
+                        Due {formatUtcDate(bill.date, "MMM d")}
                       </div>
                     )}
                   </div>

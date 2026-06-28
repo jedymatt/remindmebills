@@ -1,10 +1,10 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { format } from "date-fns";
 import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { formatUtcDate } from "~/lib/date-utils";
 import type { PlaygroundBill, PlaygroundBillData } from "~/types";
 import {
   BillFormFields,
@@ -69,7 +69,7 @@ function PlaygroundBillViewMode({
         {bill.type === "single" ? (
           <div>
             <p className="text-muted-foreground text-sm">Due Date</p>
-            <p className="font-medium">{format(bill.date, "MMMM d, yyyy")}</p>
+            <p className="font-medium">{formatUtcDate(bill.date, "MMMM d, yyyy")}</p>
           </div>
         ) : (
           <div>
@@ -81,7 +81,7 @@ function PlaygroundBillViewMode({
             </p>
             {bill.recurrence.dtstart && (
               <p className="text-muted-foreground text-sm">
-                Starting {format(bill.recurrence.dtstart, "MMMM d, yyyy")}
+                Starting {formatUtcDate(bill.recurrence.dtstart, "MMMM d, yyyy")}
               </p>
             )}
           </div>
