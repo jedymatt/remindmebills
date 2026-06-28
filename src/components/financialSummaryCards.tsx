@@ -7,10 +7,15 @@ import {
   PiggyBank,
   Wallet,
 } from "lucide-react";
-import { formatDate, startOfDay } from "date-fns";
+import { startOfDay } from "date-fns";
 import { sumBy } from "lodash";
 import { Card, CardContent } from "~/components/ui/card";
 import { createPayRule, computeBillsInPeriod } from "~/lib/bill-utils";
+import {
+  formatUtcDate,
+  localDateToUtcDateOnly,
+  utcDateOnlyToLocal,
+} from "~/lib/date-utils";
 import type { BillEvent, IncomeProfile } from "~/types";
 
 function formatPHP(value: number) {
@@ -29,7 +34,7 @@ export function FinancialSummaryCards({
 }) {
   const { currentPeriodBills, nextBill } = useMemo(() => {
     const payRule = createPayRule(incomeProfile);
-    const currentPay = payRule.before(new Date(), true);
+    const currentPay = payRule.before(localDateToUtcDateOnly(new Date()), true);
     if (!currentPay) return { currentPeriodBills: [], nextBill: null };
 
     const nextPayDate = payRule.after(currentPay);
@@ -41,7 +46,9 @@ export function FinancialSummaryCards({
     // granularity: bill dates are at midnight, so `b.date >= new Date()` would
     // drop a bill due today once the wall clock passes midnight.
     const today = startOfDay(new Date());
-    const upcoming = periodBills.find((b) => b.date >= today);
+    const upcoming = periodBills.find(
+      (b) => utcDateOnlyToLocal(b.date) >= today,
+    );
 
     return { currentPeriodBills: periodBills, nextBill: upcoming ?? null };
   }, [incomeProfile, bills]);
@@ -73,7 +80,7 @@ export function FinancialSummaryCards({
       icon: CalendarClock,
       label: "Next Bill",
       value: nextBill?.title ?? "None",
-      subtitle: nextBill ? formatDate(nextBill.date, "MMM dd, yyyy") : "No upcoming bills",
+      subtitle: nextBill ? formatUtcDate(nextBill.date, "MMM dd, yyyy") : "No upcoming bills",
     },
   ];
 

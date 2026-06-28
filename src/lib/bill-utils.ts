@@ -1,5 +1,6 @@
 import { addMonths, isAfter, isBefore, isEqual } from "date-fns";
 import { RRule } from "rrule";
+import { localDateToUtcDateOnly } from "./date-utils";
 import type { BillEvent, IncomeProfile } from "~/types";
 
 export function getFrequency(freq: "weekly" | "fortnightly" | "monthly") {
@@ -144,7 +145,7 @@ export function getBillsByPayPeriod(
   monthsAhead = 6,
 ) {
   const payRule = createPayRule(incomeProfile);
-  const currentPay = payRule.before(new Date(), true)!;
+  const currentPay = payRule.before(localDateToUtcDateOnly(new Date()), true)!;
   const paysUntilFuture = payRule.between(
     currentPay,
     addMonths(currentPay, monthsAhead),
@@ -170,7 +171,7 @@ export function getPayPeriodsByCount(
 ) {
   const payRule = createPayRule(incomeProfile);
   const payDates: Date[] = [];
-  let currentPay = payRule.before(new Date(), true)!;
+  let currentPay = payRule.before(localDateToUtcDateOnly(new Date()), true)!;
   for (let i = 0; i < count; i++) {
     payDates.push(currentPay);
     currentPay = payRule.after(currentPay)!;

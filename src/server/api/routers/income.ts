@@ -1,6 +1,7 @@
 import { ObjectId } from "mongodb";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import type { IncomeProfile } from "~/types";
+import { roundToUtcDateOnly } from "~/lib/date-utils";
 import { z } from "zod";
 
 export const incomeRouter = createTRPCRouter({
@@ -9,7 +10,15 @@ export const incomeRouter = createTRPCRouter({
       .collection<IncomeProfile>("income_profiles")
       .findOne({ userId: new ObjectId(ctx.session.user.id) });
 
-    return incomeProfile;
+    if (!incomeProfile) return incomeProfile;
+
+    // Heal legacy rows stored at local midnight to the canonical UTC-midnight
+    // date-only form so scheduling/rendering is timezone-stable. Idempotent for
+    // already-canonical rows.
+    return {
+      ...incomeProfile,
+      startDate: roundToUtcDateOnly(incomeProfile.startDate),
+    };
   }),
 
   createIncomeProfile: protectedProcedure
@@ -25,7 +34,7 @@ export const incomeRouter = createTRPCRouter({
       const incomeProfile = {
         userId: new ObjectId(ctx.session.user.id),
         payFrequency,
-        startDate,
+        startDate: roundToUtcDateOnly(startDate),
       };
 
       await ctx.db
@@ -46,7 +55,7 @@ export const incomeRouter = createTRPCRouter({
       if (input.payFrequency !== undefined)
         updateFields.payFrequency = input.payFrequency;
       if (input.startDate !== undefined)
-        updateFields.startDate = input.startDate;
+        updateFields.startDate = roundToUtcDateOnly(input.startDate);
       if (input.amount !== undefined) updateFields.amount = input.amount;
 
       await ctx.db

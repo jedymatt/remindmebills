@@ -1,8 +1,8 @@
 "use client";
 
-import { format } from "date-fns";
 import { Calendar, Loader2, Repeat } from "lucide-react";
 import { toast } from "sonner";
+import { formatUtcDate } from "~/lib/date-utils";
 import { colorForOrder } from "~/lib/group-colors";
 import { api } from "~/trpc/react";
 import type { BillEvent } from "~/types";
@@ -136,7 +136,7 @@ export function BillViewMode({ bill, onEdit, onDelete }: BillViewModeProps) {
             <label className="text-muted-foreground text-sm">Due Date</label>
             <div className="flex items-center gap-2">
               <Calendar className="text-muted-foreground size-4" />
-              <p className="font-medium">{format(bill.date, "PPP")}</p>
+              <p className="font-medium">{formatUtcDate(bill.date, "PPP")}</p>
             </div>
           </div>
         )}
@@ -167,7 +167,7 @@ export function BillViewMode({ bill, onEdit, onDelete }: BillViewModeProps) {
                 <div className="flex items-center gap-2">
                   <Calendar className="text-muted-foreground size-4" />
                   <p className="font-medium">
-                    {format(bill.recurrence.dtstart, "PPP")}
+                    {formatUtcDate(bill.recurrence.dtstart, "PPP")}
                   </p>
                 </div>
               </div>
@@ -181,7 +181,7 @@ export function BillViewMode({ bill, onEdit, onDelete }: BillViewModeProps) {
                 <div className="flex items-center gap-2">
                   <Calendar className="text-muted-foreground size-4" />
                   <p className="font-medium">
-                    {format(bill.recurrence.until, "PPP")}
+                    {formatUtcDate(bill.recurrence.until, "PPP")}
                   </p>
                 </div>
               </div>

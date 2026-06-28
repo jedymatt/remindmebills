@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { formatDate } from "date-fns";
 import { Pencil } from "lucide-react";
+import { formatUtcDate } from "~/lib/date-utils";
 import { Button } from "~/components/ui/button";
 import { EditIncomeProfileDialog } from "./editIncomeProfileDialog";
 import type { IncomeProfile } from "~/types";
@@ -30,7 +30,7 @@ export function IncomeProfileSection({
         <div>
           <span className="text-muted-foreground">Start Date: </span>
           <span className="font-medium">
-            {formatDate(incomeProfile.startDate, "MMM dd, yyyy")}
+            {formatUtcDate(incomeProfile.startDate, "MMM dd, yyyy")}
           </span>
         </div>
         <div>
