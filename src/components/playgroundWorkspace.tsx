@@ -100,10 +100,12 @@ export function PlaygroundWorkspace() {
           removingBillIds={removingBillIds}
         />
       ) : (
-        <div className="flex flex-col items-center rounded-lg border border-dashed py-12">
-          <CalendarPlus className="text-muted-foreground mb-3 size-10" />
-          <h3 className="text-lg font-medium">No bills yet</h3>
-          <p className="text-muted-foreground mt-1 text-sm">
+        <div className="border-ledger-line flex flex-col items-center rounded-lg border border-dashed py-12">
+          <span className="bg-ledger-accent-soft text-ledger-accent-strong mb-3 flex size-11 items-center justify-center rounded-2xl">
+            <CalendarPlus className="size-5" />
+          </span>
+          <h3 className="text-ledger-ink font-display text-lg">No bills yet</h3>
+          <p className="text-ledger-muted mt-1 text-sm">
             Add a hypothetical bill to see how it affects your budget.
           </p>
           <Button className="mt-4" onClick={() => setAddDialogOpen(true)}>

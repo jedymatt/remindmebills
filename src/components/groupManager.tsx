@@ -18,7 +18,14 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { GripVertical, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  FolderTree,
+  GripVertical,
+  Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -304,8 +311,16 @@ export function GroupManager() {
             <Skeleton className="h-14 w-full" />
           </div>
         ) : orderedGroups.length === 0 ? (
-          <div className="rounded-lg border border-dashed py-12 text-center">
-            <p className="text-muted-foreground">No groups yet.</p>
+          <div className="border-ledger-line rounded-lg border border-dashed py-12 text-center">
+            <span className="bg-ledger-accent-soft text-ledger-accent-strong mx-auto mb-3 flex size-11 items-center justify-center rounded-2xl">
+              <FolderTree className="size-5" />
+            </span>
+            <h3 className="text-ledger-ink font-display text-lg">
+              No groups yet
+            </h3>
+            <p className="text-ledger-muted mt-1 text-sm">
+              Create a group to organize related bills together.
+            </p>
             <Button className="mt-4" onClick={() => setCreateOpen(true)}>
               <Plus className="mr-1 size-4" />
               Create your first group
