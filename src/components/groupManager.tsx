@@ -290,7 +290,7 @@ export function GroupManager() {
     <AuthenticatedLayout>
       <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Groups</h1>
+          <h1 className="text-ledger-ink font-display text-2xl">Groups</h1>
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="mr-1 size-4" />
             New group

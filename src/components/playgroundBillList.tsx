@@ -65,7 +65,7 @@ function PlaygroundBillListCard({
       className={cn(
         "flex flex-col overflow-hidden rounded-xl border",
         isCurrent
-          ? "ring-primary/20 border-primary/50 ring-2"
+          ? "ring-ledger-accent/40 border-ledger-accent/50 ring-2"
           : "border-border",
       )}
     >
@@ -73,11 +73,11 @@ function PlaygroundBillListCard({
       <div
         className={cn(
           "flex items-center justify-between px-5 py-3.5",
-          isCurrent ? "bg-primary/5" : "bg-muted/30",
+          isCurrent ? "bg-ledger-accent-soft/40" : "bg-muted/30",
         )}
       >
         <div>
-          <div className="text-sm font-semibold">
+          <div className="font-mono text-sm font-semibold tabular-nums">
             {formatUtcDate(payDate, "MMM d")}
             {after && <> – {formatUtcDate(subDays(after, 1), "MMM d, yyyy")}</>}
           </div>
@@ -86,7 +86,7 @@ function PlaygroundBillListCard({
           </div>
         </div>
         {isCurrent && (
-          <span className="bg-primary text-primary-foreground rounded-full px-2.5 py-0.5 text-[11px] font-medium">
+          <span className="bg-ledger-accent-soft text-ledger-accent-strong rounded-full px-2.5 py-0.5 text-[11px] font-medium">
             Current
           </span>
         )}
@@ -110,7 +110,7 @@ function PlaygroundBillListCard({
                   className={cn(
                     "hover:bg-muted/50 relative -mx-5 flex cursor-pointer items-center gap-3 px-5 py-3 transition-colors",
                     isSameDay(bill.date, payDate) &&
-                      "text-yellow-700 dark:text-yellow-500",
+                      "text-ledger-accent-strong dark:text-ledger-accent",
                     isExcluded && "opacity-40",
                   )}
                   onClick={() => onBillClick(bill.id)}
@@ -149,7 +149,7 @@ function PlaygroundBillListCard({
                     )}
                   </div>
                   {!isExcluded && (
-                    <span className="shrink-0 text-sm font-medium tabular-nums">
+                    <span className="shrink-0 font-mono text-sm font-medium tabular-nums">
                       {bill.amount != null ? (
                         formatPHP(bill.amount)
                       ) : (
@@ -178,11 +178,11 @@ function PlaygroundBillListCard({
             <span className="flex items-center gap-1">
               <span
                 className={cn(
-                  "text-sm font-semibold tabular-nums",
+                  "font-mono text-sm font-semibold tabular-nums",
                   balance > 0
-                    ? "text-green-600 dark:text-green-400"
+                    ? "text-teal-700 dark:text-teal-300"
                     : balance < 0
-                      ? "text-red-600 dark:text-red-400"
+                      ? "text-rose-600 dark:text-rose-400"
                       : "",
                 )}
               >
@@ -199,13 +199,13 @@ function PlaygroundBillListCard({
             <div className="text-muted-foreground mt-2 space-y-1 border-t pt-2 text-xs">
               <div className="flex justify-between">
                 <span>Income</span>
-                <span className="tabular-nums">
+                <span className="font-mono tabular-nums">
                   {formatPHP(ingoing, "always")}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>Bills</span>
-                <span className="tabular-nums">
+                <span className="font-mono tabular-nums">
                   {formatPHP(-outgoing, "always")}
                 </span>
               </div>
