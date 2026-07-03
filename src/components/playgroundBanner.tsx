@@ -1,12 +1,12 @@
-import { AlertTriangle } from "lucide-react";
+import { Info } from "lucide-react";
 
 export function PlaygroundBanner() {
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-      <AlertTriangle className="size-4 shrink-0" />
+    <div className="border-ledger-accent/20 bg-ledger-accent-soft/50 text-ledger-accent-strong flex items-center gap-2 rounded-lg border px-4 py-3">
+      <Info className="size-4 shrink-0" />
       <p className="text-sm">
-        <span className="font-medium">Playground Mode</span> — Changes are
-        temporary and won&apos;t be saved.
+        <span className="font-medium">Playground mode</span>
+        {" — changes are temporary and won't be saved."}
       </p>
     </div>
   );
