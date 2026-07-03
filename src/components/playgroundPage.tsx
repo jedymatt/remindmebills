@@ -35,15 +35,19 @@ function NoIncomeProfileState() {
   return (
     <div className="mx-auto max-w-5xl p-4 sm:p-6">
       <div className="flex flex-col items-center justify-center py-16">
-        <Receipt className="text-muted-foreground mb-4 size-12" />
-        <h2 className="text-2xl font-bold">Set Up Your Income First</h2>
-        <p className="text-muted-foreground mt-1 max-w-md text-center">
+        <span className="bg-ledger-accent-soft text-ledger-accent-strong mb-4 flex size-12 items-center justify-center rounded-2xl">
+          <Receipt className="size-6" />
+        </span>
+        <h2 className="text-ledger-ink font-display text-2xl">
+          Set Up Your Income First
+        </h2>
+        <p className="text-ledger-muted mt-1 max-w-md text-center">
           To use the playground, you need to set up your income profile on the
           dashboard first.
         </p>
         <Link
           href="/dashboard"
-          className="text-primary mt-4 text-sm font-medium hover:underline"
+          className="text-ledger-accent-strong mt-4 text-sm font-medium hover:underline"
         >
           Go to Dashboard
         </Link>
@@ -54,7 +58,11 @@ function NoIncomeProfileState() {
 
 // Separated so incomeProfile can be passed as a concrete value,
 // avoiding the non-null assertion that would be needed if reading from context.
-function PlaygroundContent({ incomeProfile }: { incomeProfile: IncomeProfile }) {
+function PlaygroundContent({
+  incomeProfile,
+}: {
+  incomeProfile: IncomeProfile;
+}) {
   const { isInitialized } = usePlayground();
 
   if (!isInitialized) {

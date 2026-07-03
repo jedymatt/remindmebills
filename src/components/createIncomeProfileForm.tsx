@@ -115,7 +115,9 @@ export function CreateIncomeProfileForm() {
 export function IncomeProfileSetup() {
   return (
     <div className="w-full space-y-6 rounded-lg border p-6 shadow-md">
-      <h2 className="text-2xl font-bold">Setup Income Profile</h2>
+      <h2 className="text-ledger-ink font-display text-2xl">
+        Setup Income Profile
+      </h2>
       <CreateIncomeProfileForm />
     </div>
   );

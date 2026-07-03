@@ -83,7 +83,9 @@ export function PlaygroundWorkspace() {
       />
 
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Bills by Pay Period</h2>
+        <h2 className="text-ledger-ink font-display text-xl">
+          Bills by Pay Period
+        </h2>
         <Button size="sm" onClick={() => setAddDialogOpen(true)}>
           Add Bill <CalendarPlus className="ml-1 size-4" />
         </Button>

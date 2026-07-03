@@ -6,7 +6,11 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { api } from "~/trpc/react";
-import { BillFormFields, BillFormValuesSchema, type BillFormValues } from "./billFormFields";
+import {
+  BillFormFields,
+  BillFormValuesSchema,
+  type BillFormValues,
+} from "./billFormFields";
 import { Button } from "./ui/button";
 import {
   Card,
@@ -53,7 +57,7 @@ export function CreateBillForm() {
   return (
     <Card className="w-full max-w-lg">
       <CardHeader>
-        <CardTitle>Create a new bill</CardTitle>
+        <CardTitle className="font-display">Create a new bill</CardTitle>
         <CardDescription>
           Fill in the details of the bill you want to create.
         </CardDescription>
