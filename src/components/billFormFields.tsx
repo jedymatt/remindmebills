@@ -3,8 +3,8 @@
 import { useWatch, type UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 import { api } from "~/trpc/react";
-import { formatUtcDate } from "~/lib/date-utils";
 import { colorForOrder } from "~/lib/group-colors";
+import { DateInput } from "./dateInput";
 import {
   Form,
   FormControl,
@@ -193,14 +193,7 @@ export function BillFormFields({
                 <FormItem className="flex flex-col">
                   <FormLabel>Date</FormLabel>
                   <FormControl>
-                    <Input
-                      type="date"
-                      placeholder="Date"
-                      {...field}
-                      value={
-                        field.value ? formatUtcDate(field.value, "yyyy-MM-dd") : ""
-                      }
-                    />
+                    <DateInput placeholder="Date" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -264,14 +257,7 @@ export function BillFormFields({
                 <FormItem>
                   <FormLabel>Date Start</FormLabel>
                   <FormControl>
-                    <Input
-                      type="date"
-                      placeholder="Date Start"
-                      {...field}
-                      value={
-                        field.value ? formatUtcDate(field.value, "yyyy-MM-dd") : ""
-                      }
-                    />
+                    <DateInput placeholder="Date Start" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -329,16 +315,10 @@ export function BillFormFields({
                         Until
                       </FormLabel>
                       <FormControl>
-                        <Input
-                          type="date"
+                        <DateInput
                           placeholder="Until"
                           {...field}
                           disabled={recurringEndsWith !== "until"}
-                          value={
-                            field.value
-                              ? formatUtcDate(field.value, "yyyy-MM-dd")
-                              : ""
-                          }
                         />
                       </FormControl>
                       <FormMessage />

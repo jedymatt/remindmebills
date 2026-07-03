@@ -43,6 +43,20 @@ export function formatUtcDate(date: Date, formatStr: string): string {
 }
 
 /**
+ * Parse a native `<input type="date">` value (`"yyyy-MM-dd"`, or `""` when
+ * cleared) into a canonical UTC-midnight `Date`, or `undefined` when empty or
+ * invalid. The inverse of rendering with `formatUtcDate(value, "yyyy-MM-dd")`:
+ * keeps date-only form state a `Date` (not the input's raw string) so the
+ * display formatter and the `z.coerce.date()` schema agree. `new Date("yyyy-MM-dd")`
+ * parses as UTC midnight, which is exactly the canonical representation.
+ */
+export function dateInputToUtcDateOnly(value: string): Date | undefined {
+  if (!value) return undefined;
+  const parsed = new Date(value);
+  return isNaN(parsed.getTime()) ? undefined : parsed;
+}
+
+/**
  * Round an arbitrary instant to the nearest UTC midnight. Used to canonicalize
  * legacy income rows that were stored at *local* midnight (the old Calendar)
  * when read/written, without a data migration. Already-canonical (UTC-midnight)
