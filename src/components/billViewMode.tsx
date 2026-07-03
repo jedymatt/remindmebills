@@ -70,7 +70,7 @@ export function BillViewMode({ bill, onEdit, onDelete }: BillViewModeProps) {
 
         <div>
           <label className="text-muted-foreground text-sm">Amount</label>
-          <p className="text-lg font-medium">
+          <p className="font-mono text-lg font-medium tabular-nums">
             {bill.amount != null ? (
               <>
                 ₱

@@ -61,7 +61,7 @@ function PlaygroundBillViewMode({
 
         <div>
           <p className="text-muted-foreground text-sm">Amount</p>
-          <p className="text-lg font-medium">
+          <p className="font-mono text-lg font-medium tabular-nums">
             {bill.amount != null ? formatPHP(bill.amount) : "Not set"}
           </p>
         </div>
@@ -69,7 +69,9 @@ function PlaygroundBillViewMode({
         {bill.type === "single" ? (
           <div>
             <p className="text-muted-foreground text-sm">Due Date</p>
-            <p className="font-medium">{formatUtcDate(bill.date, "MMMM d, yyyy")}</p>
+            <p className="font-medium">
+              {formatUtcDate(bill.date, "MMMM d, yyyy")}
+            </p>
           </div>
         ) : (
           <div>
@@ -81,7 +83,8 @@ function PlaygroundBillViewMode({
             </p>
             {bill.recurrence.dtstart && (
               <p className="text-muted-foreground text-sm">
-                Starting {formatUtcDate(bill.recurrence.dtstart, "MMMM d, yyyy")}
+                Starting{" "}
+                {formatUtcDate(bill.recurrence.dtstart, "MMMM d, yyyy")}
               </p>
             )}
           </div>
