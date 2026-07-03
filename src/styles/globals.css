@@ -93,9 +93,40 @@
   }
 }
 
+/* Landing page: gentle staggered reveal for the "upcoming bills" ledger rows. */
+@keyframes ledger-row {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @theme inline {
   --animate-glow-add: glow-add 1.5s ease-out forwards;
   --animate-glow-remove: glow-remove 0.8s ease-out forwards;
+
+  /* Fonts: Geist was defined but never mapped to --font-sans, so body text
+     fell back to the system stack. Map it, and add display/mono roles used
+     by the landing page. */
+  --font-sans: var(--font-geist-sans);
+  --font-display: var(--font-fraunces);
+  --font-mono: var(--font-geist-mono);
+
+  /* "Quiet ledger" palette — scoped to the landing page only, so the shared
+     app tokens above are untouched. */
+  --color-ledger-paper: oklch(0.985 0.004 240);
+  --color-ledger-panel: oklch(1 0 0);
+  --color-ledger-ink: oklch(0.23 0.02 255);
+  --color-ledger-muted: oklch(0.53 0.02 255);
+  --color-ledger-line: oklch(0.925 0.006 255);
+  --color-ledger-accent: oklch(0.62 0.12 162);
+  --color-ledger-accent-strong: oklch(0.52 0.11 162);
+  --color-ledger-accent-soft: oklch(0.955 0.028 165);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

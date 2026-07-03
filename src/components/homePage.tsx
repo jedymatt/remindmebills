@@ -4,17 +4,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { SVGProps } from "react";
 import { Button } from "~/components/ui/button";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card";
 import { Skeleton } from "~/components/ui/skeleton";
 import { authClient } from "~/lib/auth-client";
+import { cn } from "~/lib/utils";
 import {
   ArrowRight,
   Bell,
+  CalendarClock,
   CheckCircle,
   LayoutDashboard,
   LogIn,
@@ -42,47 +38,104 @@ function SimpleIconsGoogle(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+async function signInWithGoogle() {
+  await authClient.signIn.social({
+    provider: "google",
+    callbackURL: "/dashboard",
+  });
+}
+
+async function continueAsGuest() {
+  await authClient.signIn.anonymous();
+}
+
 const features = [
   {
     icon: Bell,
-    title: "Bill Tracking",
-    description: "Keep all your bills organized with due dates and amounts in one place.",
+    title: "One tidy list",
+    description:
+      "Every bill, due date, and amount together — nothing scattered across apps and inboxes.",
   },
   {
     icon: Repeat,
-    title: "Recurring Payments",
+    title: "Recurring made simple",
     description:
-      "Track subscriptions and recurring bills with automatic scheduling.",
+      "Set a subscription once and it schedules itself every cycle, automatically.",
   },
   {
     icon: LayoutDashboard,
-    title: "Dashboard Overview",
-    description: "See all your upcoming bills at a glance in one clean view.",
+    title: "See what's coming",
+    description:
+      "A dashboard that shows what's due, and when, at a single glance.",
   },
   {
     icon: UserRound,
-    title: "Guest Mode",
-    description: "Try the app instantly without creating an account.",
+    title: "Start without an account",
+    description:
+      "Try the whole thing as a guest. Sign in with Google whenever you're ready.",
   },
 ] as const;
 
 const steps = [
   {
     icon: LogIn,
-    title: "Sign In",
-    description: "Use Google or try as a guest.",
+    title: "Sign in",
+    description: "Use Google, or jump straight in as a guest.",
   },
   {
     icon: PlusCircle,
-    title: "Add Bills",
-    description: "Enter your bills and due dates.",
+    title: "Add your bills",
+    description: "Enter each bill with its due date and amount.",
   },
   {
     icon: CheckCircle,
-    title: "Stay on Track",
-    description: "Never miss a payment again.",
+    title: "Stay ahead",
+    description: "See what's next and never miss a payment.",
   },
 ] as const;
+
+type UpcomingBill = {
+  name: string;
+  category: string;
+  due: string;
+  amount: number;
+};
+
+// The hero's signature element: a calm, ordered view of what's due — the
+// product's actual value shown rather than described. Amounts are numbers so
+// the total below stays a single source of truth.
+const upcomingBills: UpcomingBill[] = [
+  { name: "Rent", category: "Housing", due: "Jul 5", amount: 1450 },
+  { name: "Spotify", category: "Subscription", due: "Jul 9", amount: 11.99 },
+  { name: "Water", category: "Utilities", due: "Jul 14", amount: 62 },
+  { name: "Electric", category: "Utilities", due: "Jul 22", amount: 88.4 },
+];
+
+const currency = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
+
+const totalDue = upcomingBills.reduce((sum, bill) => sum + bill.amount, 0);
+
+// Each ledger row reveals a beat after the one above it, so the list settles
+// into order on load. Reduced-motion users get the settled state instantly.
+const ROW_STAGGER_MS = 90;
+
+function AuthButtons() {
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row">
+      <Button size="lg" onClick={signInWithGoogle}>
+        Continue with Google
+        <SimpleIconsGoogle className="size-4" />
+      </Button>
+      <Button variant="outline" size="lg" onClick={continueAsGuest}>
+        Try as guest
+        <UserRound className="size-4" />
+      </Button>
+    </div>
+  );
+}
 
 type NavBarProps = {
   session: { user: { name: string } } | null;
@@ -91,21 +144,28 @@ type NavBarProps = {
 
 function NavBar({ session, onClickSignOut }: NavBarProps) {
   return (
-    <header className="bg-background/80 sticky top-0 z-50 w-full border-b backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-        <div className="flex items-center gap-2 font-semibold">
-          <Receipt className="size-5" />
-          <span>Remind Me Bills</span>
+    <header className="border-ledger-line bg-ledger-paper/80 sticky top-0 z-50 w-full border-b backdrop-blur">
+      <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
+        <div className="text-ledger-ink font-display flex items-center gap-2 text-lg font-medium">
+          <span className="bg-ledger-ink text-ledger-paper flex size-7 items-center justify-center rounded-lg">
+            <Receipt className="size-4" />
+          </span>
+          Remind Me Bills
         </div>
         {session ? (
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground hidden text-sm sm:inline">
+            <span className="text-ledger-muted hidden text-sm sm:inline">
               {session.user.name}
             </span>
             <Button asChild size="sm">
               <Link href="/dashboard">Dashboard</Link>
             </Button>
-            <Button variant="ghost" size="sm" onClick={onClickSignOut}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-ledger-muted"
+              onClick={onClickSignOut}
+            >
               Sign out
             </Button>
           </div>
@@ -113,12 +173,8 @@ function NavBar({ session, onClickSignOut }: NavBarProps) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={async () => {
-              await authClient.signIn.social({
-                provider: "google",
-                callbackURL: "/dashboard",
-              });
-            }}
+            className="text-ledger-ink"
+            onClick={signInWithGoogle}
           >
             Sign in
           </Button>
@@ -128,39 +184,102 @@ function NavBar({ session, onClickSignOut }: NavBarProps) {
   );
 }
 
+function LedgerRow({ bill, index }: { bill: UpcomingBill; index: number }) {
+  const isNext = index === 0;
+  return (
+    <li
+      className="flex animate-[ledger-row_0.5s_ease-out_both] items-center gap-3 py-3 motion-reduce:animate-none"
+      style={{ animationDelay: `${index * ROW_STAGGER_MS}ms` }}
+    >
+      <span
+        className={cn(
+          "size-2 shrink-0 rounded-full",
+          isNext ? "bg-ledger-accent" : "bg-ledger-line",
+        )}
+      />
+      <div className="min-w-0 flex-1">
+        <p className="text-ledger-ink truncate text-sm font-medium">
+          {bill.name}
+        </p>
+        <p className="text-ledger-muted truncate text-xs">{bill.category}</p>
+      </div>
+      <span className="text-ledger-muted font-mono text-xs tabular-nums">
+        {bill.due}
+      </span>
+      <span className="text-ledger-ink w-20 text-right font-mono text-sm font-medium tabular-nums">
+        {currency.format(bill.amount)}
+      </span>
+    </li>
+  );
+}
+
+function LedgerPanel() {
+  return (
+    <div className="relative">
+      {/* soft accent glow anchoring the panel to the page */}
+      <div
+        aria-hidden
+        className="bg-ledger-accent-soft/60 absolute -inset-4 -z-10 rounded-[2rem] blur-2xl"
+      />
+      <div className="border-ledger-line bg-ledger-panel shadow-ledger-ink/5 rounded-2xl border p-5 shadow-xl sm:p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-ledger-muted text-xs font-medium tracking-wider uppercase">
+              This month
+            </p>
+            <p className="text-ledger-ink font-display mt-0.5 text-lg">
+              Upcoming bills
+            </p>
+          </div>
+          <span className="bg-ledger-accent-soft text-ledger-accent-strong flex size-9 items-center justify-center rounded-full">
+            <CalendarClock className="size-4" />
+          </span>
+        </div>
+        <ul className="divide-ledger-line mt-5 divide-y">
+          {upcomingBills.map((bill, index) => (
+            <LedgerRow key={bill.name} bill={bill} index={index} />
+          ))}
+        </ul>
+        <div className="border-ledger-line mt-5 flex items-center justify-between border-t pt-4">
+          <div className="text-ledger-accent-strong flex items-center gap-1.5 text-sm font-medium">
+            <CheckCircle className="size-4" />
+            You&apos;re on track
+          </div>
+          <div className="text-right">
+            <p className="text-ledger-muted text-xs">Due this month</p>
+            <p className="text-ledger-ink font-mono text-base font-medium tabular-nums">
+              {currency.format(totalDue)}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HeroSection() {
   return (
-    <section className="flex flex-col items-center px-4 py-20 text-center lg:py-32">
-      <h1 className="max-w-2xl text-4xl font-bold tracking-tight lg:text-5xl">
-        Never Miss a Bill Again
-      </h1>
-      <p className="text-muted-foreground mt-4 max-w-lg text-lg">
-        Track your bills, manage recurring payments, and stay on top of your
-        finances — all in one place.
-      </p>
-      <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-        <Button
-          size="lg"
-          onClick={async () => {
-            await authClient.signIn.social({
-              provider: "google",
-              callbackURL: "/dashboard",
-            });
-          }}
-        >
-          Sign in with Google
-          <SimpleIconsGoogle className="ml-1.5 inline size-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="lg"
-          onClick={async () => {
-            await authClient.signIn.anonymous();
-          }}
-        >
-          Try as Guest
-          <UserRound className="ml-1.5 inline size-4" />
-        </Button>
+    <section className="px-4 pt-16 pb-20 lg:pt-24 lg:pb-28">
+      <div className="mx-auto grid max-w-5xl items-center gap-12 lg:grid-cols-2">
+        <div>
+          <p className="text-ledger-accent-strong text-xs font-semibold tracking-[0.18em] uppercase">
+            Bill &amp; subscription tracker
+          </p>
+          <h1 className="text-ledger-ink font-display mt-4 text-4xl leading-[1.05] tracking-tight lg:text-6xl">
+            Never miss a bill again.
+          </h1>
+          <p className="text-ledger-muted mt-5 max-w-md text-lg">
+            Keep every bill, subscription, and due date in one calm list — and
+            see exactly what&apos;s coming before it&apos;s due.
+          </p>
+          <div className="mt-8">
+            <AuthButtons />
+          </div>
+          <p className="text-ledger-muted mt-4 text-sm">
+            Free to use — start as a guest, no card required.
+          </p>
+        </div>
+        <LedgerPanel />
       </div>
     </section>
   );
@@ -168,23 +287,30 @@ function HeroSection() {
 
 function FeaturesSection() {
   return (
-    <section className="bg-muted/50 w-full px-4 py-16">
+    <section className="border-ledger-line border-t px-4 py-20">
       <div className="mx-auto max-w-5xl">
-        <h2 className="text-center text-2xl font-bold lg:text-3xl">
-          Everything You Need
-        </h2>
-        <p className="text-muted-foreground mt-2 text-center">
-          Simple tools to keep your bills organized.
-        </p>
-        <div className="mt-10 grid gap-4 sm:grid-cols-2">
+        <div className="max-w-xl">
+          <h2 className="text-ledger-ink font-display text-3xl lg:text-4xl">
+            Everything in one calm place
+          </h2>
+          <p className="text-ledger-muted mt-3">
+            Simple tools that keep your bills organized and your due dates in
+            plain sight.
+          </p>
+        </div>
+        <div className="mt-12 grid gap-x-8 gap-y-10 sm:grid-cols-2">
           {features.map((feature) => (
-            <Card key={feature.title}>
-              <CardHeader>
-                <feature.icon className="text-primary mb-1 size-6" />
-                <CardTitle>{feature.title}</CardTitle>
-                <CardDescription>{feature.description}</CardDescription>
-              </CardHeader>
-            </Card>
+            <div key={feature.title} className="flex gap-4">
+              <span className="bg-ledger-accent-soft text-ledger-accent-strong flex size-10 shrink-0 items-center justify-center rounded-xl">
+                <feature.icon className="size-5" />
+              </span>
+              <div>
+                <h3 className="text-ledger-ink font-medium">{feature.title}</h3>
+                <p className="text-ledger-muted mt-1 text-sm">
+                  {feature.description}
+                </p>
+              </div>
+            </div>
           ))}
         </div>
       </div>
@@ -194,25 +320,25 @@ function FeaturesSection() {
 
 function HowItWorksSection() {
   return (
-    <section className="px-4 py-16">
+    <section className="border-ledger-line bg-ledger-accent-soft/30 border-t px-4 py-20">
       <div className="mx-auto max-w-5xl">
-        <h2 className="text-center text-2xl font-bold lg:text-3xl">
-          How It Works
+        <h2 className="text-ledger-ink font-display text-3xl lg:text-4xl">
+          How it works
         </h2>
-        <div className="mt-10 grid gap-8 sm:grid-cols-3">
-          {steps.map((step, i) => (
-            <div
-              key={step.title}
-              className="flex flex-col items-center text-center"
-            >
-              <div className="bg-primary text-primary-foreground flex size-12 items-center justify-center rounded-full">
-                <step.icon className="size-6" />
+        <div className="mt-12 grid gap-10 sm:grid-cols-3">
+          {steps.map((step, index) => (
+            <div key={step.title}>
+              <div className="flex items-center gap-3">
+                <span className="text-ledger-accent-strong font-mono text-sm font-medium">
+                  0{index + 1}
+                </span>
+                <span className="bg-ledger-line h-px flex-1" />
               </div>
-              <p className="text-muted-foreground mt-1 text-sm font-medium">
-                Step {i + 1}
-              </p>
-              <h3 className="mt-2 text-lg font-semibold">{step.title}</h3>
-              <p className="text-muted-foreground mt-1 text-sm">
+              <step.icon className="text-ledger-ink mt-5 size-6" />
+              <h3 className="text-ledger-ink mt-3 text-lg font-medium">
+                {step.title}
+              </h3>
+              <p className="text-ledger-muted mt-1 text-sm">
                 {step.description}
               </p>
             </div>
@@ -225,37 +351,16 @@ function HowItWorksSection() {
 
 function CtaSection() {
   return (
-    <section className="bg-muted/50 w-full px-4 py-16">
+    <section className="border-ledger-line border-t px-4 py-20">
       <div className="mx-auto flex max-w-xl flex-col items-center text-center">
-        <h2 className="text-2xl font-bold lg:text-3xl">
-          Ready to Take Control?
+        <h2 className="text-ledger-ink font-display text-3xl lg:text-4xl">
+          Ready to take control?
         </h2>
-        <p className="text-muted-foreground mt-2">
-          Start tracking your bills today — it only takes a minute.
+        <p className="text-ledger-muted mt-3">
+          Add your first bill in under a minute. No account needed to start.
         </p>
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <Button
-            size="lg"
-            onClick={async () => {
-              await authClient.signIn.social({
-                provider: "google",
-                callbackURL: "/dashboard",
-              });
-            }}
-          >
-            Sign in with Google
-            <SimpleIconsGoogle className="ml-1.5 inline size-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={async () => {
-              await authClient.signIn.anonymous();
-            }}
-          >
-            Try as Guest
-            <UserRound className="ml-1.5 inline size-4" />
-          </Button>
+        <div className="mt-8">
+          <AuthButtons />
         </div>
       </div>
     </section>
@@ -264,13 +369,20 @@ function CtaSection() {
 
 function WelcomeBackSection({ name }: { name: string }) {
   return (
-    <section className="flex flex-1 flex-col items-center justify-center px-4 py-20 text-center">
-      <h1 className="text-3xl font-bold lg:text-4xl">Welcome back, {name}</h1>
-      <p className="text-muted-foreground mt-2">Pick up where you left off.</p>
-      <Button asChild size="lg" className="mt-6">
+    <section className="flex flex-1 flex-col items-center justify-center px-4 py-24 text-center">
+      <p className="text-ledger-accent-strong text-xs font-semibold tracking-[0.18em] uppercase">
+        Welcome back
+      </p>
+      <h1 className="text-ledger-ink font-display mt-4 text-4xl lg:text-5xl">
+        Hello, {name}
+      </h1>
+      <p className="text-ledger-muted mt-3">
+        Pick up right where you left off.
+      </p>
+      <Button asChild size="lg" className="mt-8">
         <Link href="/dashboard">
-          Go to Dashboard
-          <ArrowRight className="ml-1.5 size-4" />
+          Go to dashboard
+          <ArrowRight className="size-4" />
         </Link>
       </Button>
     </section>
@@ -279,12 +391,13 @@ function WelcomeBackSection({ name }: { name: string }) {
 
 function Footer() {
   return (
-    <footer className="border-t px-4 py-6">
-      <div className="mx-auto flex max-w-5xl items-center justify-center gap-2 text-sm">
-        <Receipt className="text-muted-foreground size-4" />
-        <span className="text-muted-foreground">
-          Remind Me Bills &copy; {new Date().getFullYear()}
-        </span>
+    <footer className="border-ledger-line border-t px-4 py-8">
+      <div className="text-ledger-muted mx-auto flex max-w-5xl flex-col items-center justify-between gap-3 text-sm sm:flex-row">
+        <div className="flex items-center gap-2">
+          <Receipt className="size-4" />
+          <span>Remind Me Bills</span>
+        </div>
+        <span>&copy; {new Date().getFullYear()} Remind Me Bills</span>
       </div>
     </footer>
   );
@@ -292,22 +405,24 @@ function Footer() {
 
 function LoadingSkeleton() {
   return (
-    <div className="flex min-h-svh flex-col">
-      {/* Nav skeleton */}
-      <div className="w-full border-b">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-          <Skeleton className="h-5 w-36" />
+    <div className="bg-ledger-paper flex min-h-svh flex-col">
+      <div className="border-ledger-line w-full border-b">
+        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
+          <Skeleton className="h-6 w-40" />
           <Skeleton className="h-8 w-20" />
         </div>
       </div>
-      {/* Hero skeleton */}
-      <div className="flex flex-1 flex-col items-center px-4 pt-20">
-        <Skeleton className="h-10 w-80" />
-        <Skeleton className="mt-4 h-5 w-64" />
-        <div className="mt-8 flex gap-3">
-          <Skeleton className="h-10 w-40" />
-          <Skeleton className="h-10 w-32" />
+      <div className="mx-auto grid w-full max-w-5xl flex-1 items-center gap-12 px-4 pt-16 lg:grid-cols-2">
+        <div>
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="mt-4 h-14 w-full max-w-sm" />
+          <Skeleton className="mt-4 h-5 w-64" />
+          <div className="mt-8 flex gap-3">
+            <Skeleton className="h-10 w-44" />
+            <Skeleton className="h-10 w-32" />
+          </div>
         </div>
+        <Skeleton className="h-72 w-full rounded-2xl" />
       </div>
     </div>
   );
@@ -328,7 +443,7 @@ export function HomePage() {
   };
 
   return (
-    <div className="flex min-h-svh flex-col">
+    <div className="bg-ledger-paper text-ledger-ink flex min-h-svh flex-col font-sans antialiased">
       <NavBar session={session} onClickSignOut={handleSignOut} />
 
       {session ? (
