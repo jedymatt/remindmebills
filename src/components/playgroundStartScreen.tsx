@@ -33,20 +33,24 @@ export function PlaygroundStartScreen({
 
   return (
     <div className="flex flex-col items-center justify-center py-16">
-      <FlaskConical className="text-muted-foreground mb-4 size-12" />
-      <h1 className="text-2xl font-bold">Financial Playground</h1>
-      <p className="text-muted-foreground mt-2 max-w-md text-center">
+      <span className="bg-ledger-accent-soft text-ledger-accent-strong mb-4 flex size-12 items-center justify-center rounded-2xl">
+        <FlaskConical className="size-6" />
+      </span>
+      <h1 className="text-ledger-ink font-display text-3xl">
+        Financial Playground
+      </h1>
+      <p className="text-ledger-muted mt-2 max-w-md text-center">
         Experiment with &quot;what-if&quot; scenarios. Add hypothetical bills to
         see how they&apos;d affect your budget. Nothing is saved.
       </p>
 
       <div className="mt-8 grid w-full max-w-lg gap-4 sm:grid-cols-2">
         <Card
-          className="cursor-pointer transition-colors hover:border-primary"
+          className="hover:border-ledger-accent cursor-pointer transition-colors"
           onClick={handleStartFresh}
         >
           <CardHeader className="pb-2">
-            <FileText className="text-primary mb-2 size-8" />
+            <FileText className="text-ledger-accent-strong mb-2 size-8" />
             <CardTitle className="text-lg">Start Fresh</CardTitle>
           </CardHeader>
           <CardContent>
@@ -61,12 +65,12 @@ export function PlaygroundStartScreen({
             "transition-colors",
             isBillsLoading
               ? "cursor-not-allowed opacity-50"
-              : "cursor-pointer hover:border-primary",
+              : "hover:border-ledger-accent cursor-pointer",
           )}
           onClick={isBillsLoading ? undefined : handleCloneBills}
         >
           <CardHeader className="pb-2">
-            <Copy className="text-primary mb-2 size-8" />
+            <Copy className="text-ledger-accent-strong mb-2 size-8" />
             <CardTitle className="text-lg">Clone My Bills</CardTitle>
           </CardHeader>
           <CardContent>

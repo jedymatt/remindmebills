@@ -14,6 +14,7 @@ import {
 
 import { useQueryClient } from "@tanstack/react-query";
 import { authClient } from "~/lib/auth-client";
+import { cn } from "~/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
 import {
@@ -32,6 +33,17 @@ import {
   SheetTrigger,
 } from "./ui/sheet";
 
+function Wordmark() {
+  return (
+    <span className="text-ledger-ink font-display flex items-center gap-2 text-lg font-medium">
+      <span className="bg-ledger-ink text-ledger-paper flex size-7 items-center justify-center rounded-lg">
+        <Receipt className="size-4" />
+      </span>
+      Remind Me Bills
+    </span>
+  );
+}
+
 function UserNav() {
   const router = useRouter();
   const { data: session } = authClient.useSession();
@@ -40,7 +52,7 @@ function UserNav() {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-muted-foreground hidden text-sm sm:inline">
+      <span className="text-ledger-muted hidden text-sm sm:inline">
         {session?.user?.name}
       </span>
       <DropdownMenu>
@@ -96,29 +108,32 @@ export function AuthenticatedLayout({ children }: PropsWithChildren) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <div className="flex min-h-svh flex-col">
-      <header className="bg-background/80 sticky top-0 z-50 border-b backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
+    <div className="bg-ledger-paper text-ledger-ink font-sans flex min-h-svh flex-col antialiased">
+      <header className="border-ledger-line bg-ledger-paper/80 sticky top-0 z-50 w-full border-b backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
           <div className="flex items-center gap-6">
-            <Link href="/" className="flex items-center gap-2 font-semibold">
-              <Receipt className="size-5" />
-              <span>Remind Me Bills</span>
+            <Link href="/">
+              <Wordmark />
             </Link>
             <nav className="hidden items-center gap-4 sm:flex">
-              {navLinks.map(({ href, label, icon: Icon }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className={`flex items-center gap-1 text-sm font-medium transition-colors hover:text-foreground ${
-                    pathname === href
-                      ? "text-foreground"
-                      : "text-muted-foreground"
-                  }`}
-                >
-                  {Icon && <Icon className="size-3.5" />}
-                  {label}
-                </Link>
-              ))}
+              {navLinks.map(({ href, label, icon: Icon }) => {
+                const isActive = pathname === href;
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={cn(
+                      "flex items-center gap-1.5 text-sm font-medium transition-colors",
+                      isActive
+                        ? "text-ledger-accent-strong"
+                        : "text-ledger-muted hover:text-ledger-ink",
+                    )}
+                  >
+                    <Icon className="size-3.5" />
+                    {label}
+                  </Link>
+                );
+              })}
             </nav>
           </div>
           <div className="flex items-center gap-2">
@@ -135,27 +150,32 @@ export function AuthenticatedLayout({ children }: PropsWithChildren) {
               </SheetTrigger>
               <SheetContent side="left">
                 <SheetHeader>
-                  <SheetTitle className="flex items-center gap-2">
-                    <Receipt className="size-5" />
-                    Remind Me Bills
+                  <SheetTitle asChild>
+                    <span>
+                      <Wordmark />
+                    </span>
                   </SheetTitle>
                 </SheetHeader>
                 <nav className="flex flex-col gap-1 px-6">
-                  {navLinks.map(({ href, label, icon: Icon }) => (
-                    <Link
-                      key={href}
-                      href={href}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground ${
-                        pathname === href
-                          ? "bg-accent text-accent-foreground"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      {Icon && <Icon className="size-4" />}
-                      {label}
-                    </Link>
-                  ))}
+                  {navLinks.map(({ href, label, icon: Icon }) => {
+                    const isActive = pathname === href;
+                    return (
+                      <Link
+                        key={href}
+                        href={href}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={cn(
+                          "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                          isActive
+                            ? "bg-ledger-accent-soft text-ledger-accent-strong"
+                            : "text-ledger-muted hover:bg-ledger-accent-soft/50 hover:text-ledger-ink",
+                        )}
+                      >
+                        <Icon className="size-4" />
+                        {label}
+                      </Link>
+                    );
+                  })}
                 </nav>
               </SheetContent>
             </Sheet>
@@ -164,12 +184,13 @@ export function AuthenticatedLayout({ children }: PropsWithChildren) {
         </div>
       </header>
       <main className="flex-1">{children}</main>
-      <footer className="border-t px-4 py-6">
-        <div className="mx-auto flex max-w-5xl items-center justify-center gap-2 text-sm">
-          <Receipt className="text-muted-foreground size-4" />
-          <span className="text-muted-foreground">
-            Remind Me Bills &copy; {new Date().getFullYear()}
-          </span>
+      <footer className="border-ledger-line border-t px-4 py-8">
+        <div className="text-ledger-muted mx-auto flex max-w-5xl flex-col items-center justify-between gap-3 text-sm sm:flex-row">
+          <div className="flex items-center gap-2">
+            <Receipt className="size-4" />
+            <span>Remind Me Bills</span>
+          </div>
+          <span>&copy; {new Date().getFullYear()} Remind Me Bills</span>
         </div>
       </footer>
     </div>

@@ -105,15 +105,15 @@ type UpcomingBill = {
 // product's actual value shown rather than described. Amounts are numbers so
 // the total below stays a single source of truth.
 const upcomingBills: UpcomingBill[] = [
-  { name: "Rent", category: "Housing", due: "Jul 5", amount: 1450 },
-  { name: "Spotify", category: "Subscription", due: "Jul 9", amount: 11.99 },
-  { name: "Water", category: "Utilities", due: "Jul 14", amount: 62 },
-  { name: "Electric", category: "Utilities", due: "Jul 22", amount: 88.4 },
+  { name: "Rent", category: "Housing", due: "Jul 5", amount: 15000 },
+  { name: "Spotify", category: "Subscription", due: "Jul 9", amount: 149 },
+  { name: "Water", category: "Utilities", due: "Jul 14", amount: 640 },
+  { name: "Electric", category: "Utilities", due: "Jul 22", amount: 2300 },
 ];
 
-const currency = new Intl.NumberFormat("en-US", {
+const currency = new Intl.NumberFormat("en-PH", {
   style: "currency",
-  currency: "USD",
+  currency: "PHP",
 });
 
 const totalDue = upcomingBills.reduce((sum, bill) => sum + bill.amount, 0);
