@@ -65,14 +65,16 @@ function BillRowItem({
       )}
       onClick={onClick}
     >
-      {/* Eye toggle — hidden until hover; always visible when excluded */}
+      {/* Eye toggle — always visible when excluded. Otherwise visible by
+          default (so it's reachable on touch), and only reveal-on-hover on
+          devices that actually support hover. */}
       <button
         type="button"
         className={cn(
           "shrink-0 transition-all",
           isExcluded
             ? "text-muted-foreground/60 opacity-100"
-            : "text-muted-foreground/60 hover:text-muted-foreground opacity-0 group-hover:opacity-100",
+            : "text-muted-foreground/60 hover:text-muted-foreground opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100",
         )}
         onClick={(e) => {
           e.stopPropagation();
