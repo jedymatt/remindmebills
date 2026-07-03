@@ -70,9 +70,13 @@ function NoIncomeProfileState() {
   return (
     <div className="mx-auto max-w-5xl p-4 sm:p-6">
       <div className="flex flex-col items-center justify-center py-16">
-        <Receipt className="text-muted-foreground mb-4 size-12" />
-        <h2 className="text-2xl font-bold">Welcome to Remind Me Bills</h2>
-        <p className="text-muted-foreground mt-1 text-center">
+        <span className="bg-ledger-accent-soft text-ledger-accent-strong mb-4 flex size-12 items-center justify-center rounded-2xl">
+          <Receipt className="size-6" />
+        </span>
+        <h2 className="text-ledger-ink font-display text-2xl">
+          Welcome to Remind Me Bills
+        </h2>
+        <p className="text-ledger-muted mt-1 text-center">
           Set up your income profile to get started tracking your bills.
         </p>
         <div className="mt-8 w-full max-w-md">
@@ -85,10 +89,12 @@ function NoIncomeProfileState() {
 
 function NoBillsState() {
   return (
-    <div className="flex flex-col items-center rounded-lg border border-dashed py-12">
-      <FileText className="text-muted-foreground mb-3 size-10" />
-      <h3 className="text-lg font-medium">No bills yet</h3>
-      <p className="text-muted-foreground mt-1 text-sm">
+    <div className="border-ledger-line flex flex-col items-center rounded-lg border border-dashed py-12">
+      <span className="bg-ledger-accent-soft text-ledger-accent-strong mb-3 flex size-11 items-center justify-center rounded-2xl">
+        <FileText className="size-5" />
+      </span>
+      <h3 className="text-ledger-ink font-display text-lg">No bills yet</h3>
+      <p className="text-ledger-muted mt-1 text-sm">
         Add your first bill to start tracking your expenses.
       </p>
       <Button asChild className="mt-4">
@@ -135,7 +141,9 @@ export function DashboardPage() {
         />
         <IncomeProfileSection incomeProfile={incomeProfile} />
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Bills by Pay Period</h2>
+          <h2 className="text-ledger-ink font-display text-xl">
+            Bills by Pay Period
+          </h2>
           <Button asChild size="sm">
             <Link href="/bills/create">
               New Bill <CalendarPlus className="ml-1 size-4" />

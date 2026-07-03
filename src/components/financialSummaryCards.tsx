@@ -6,10 +6,12 @@ import {
   FileText,
   PiggyBank,
   Wallet,
+  type LucideIcon,
 } from "lucide-react";
 import { startOfDay } from "date-fns";
 import { sumBy } from "lodash";
 import { Card, CardContent } from "~/components/ui/card";
+import { cn } from "~/lib/utils";
 import { createPayRule, computeBillsInPeriod } from "~/lib/bill-utils";
 import {
   formatUtcDate,
@@ -24,6 +26,23 @@ function formatPHP(value: number) {
     currency: "PHP",
   });
 }
+
+// Color the balance by sign so it agrees with the bill list's money semantics:
+// teal reads as "ahead", rose as "short".
+function balanceToneClass(balance: number) {
+  if (balance > 0) return "text-teal-700 dark:text-teal-300";
+  if (balance < 0) return "text-rose-600 dark:text-rose-400";
+  return "text-ledger-ink";
+}
+
+type SummaryCard = {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  subtitle: string;
+  mono: boolean;
+  valueClassName?: string;
+};
 
 export function FinancialSummaryCards({
   incomeProfile,
@@ -57,30 +76,35 @@ export function FinancialSummaryCards({
   const totalBillAmount = sumBy(currentPeriodBills, (b) => b.amount ?? 0);
   const balance = income - totalBillAmount;
 
-  const cards = [
+  const cards: SummaryCard[] = [
     {
       icon: Wallet,
       label: "Income",
       value: income > 0 ? formatPHP(income) : "Not set",
       subtitle: `Per ${incomeProfile.payFrequency === "fortnightly" ? "fortnight" : incomeProfile.payFrequency === "weekly" ? "week" : "month"}`,
+      mono: true,
     },
     {
       icon: FileText,
       label: "Total Bills",
       value: bills.length.toString(),
       subtitle: "Active bills",
+      mono: true,
     },
     {
       icon: PiggyBank,
       label: "Balance",
       value: formatPHP(balance),
       subtitle: "This period",
+      mono: true,
+      valueClassName: balanceToneClass(balance),
     },
     {
       icon: CalendarClock,
       label: "Next Bill",
       value: nextBill?.title ?? "None",
       subtitle: nextBill ? formatUtcDate(nextBill.date, "MMM dd, yyyy") : "No upcoming bills",
+      mono: false,
     },
   ];
 
@@ -90,11 +114,19 @@ export function FinancialSummaryCards({
         <Card key={card.label}>
           <CardContent className="flex flex-col gap-1 p-4">
             <div className="flex items-center gap-2">
-              <card.icon className="text-muted-foreground size-4" />
-              <span className="text-muted-foreground text-sm">{card.label}</span>
+              <card.icon className="text-ledger-muted size-4" />
+              <span className="text-ledger-muted text-sm">{card.label}</span>
             </div>
-            <span className="truncate text-xl font-semibold">{card.value}</span>
-            <span className="text-muted-foreground text-xs">{card.subtitle}</span>
+            <span
+              className={cn(
+                "text-ledger-ink truncate text-xl font-semibold",
+                card.mono && "font-mono tabular-nums",
+                card.valueClassName,
+              )}
+            >
+              {card.value}
+            </span>
+            <span className="text-ledger-muted text-xs">{card.subtitle}</span>
           </CardContent>
         </Card>
       ))}
