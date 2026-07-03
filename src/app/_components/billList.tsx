@@ -60,7 +60,7 @@ function BillRowItem({
   return (
     <li
       className={cn(
-        "group relative -mx-2 flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-amber-50/40 dark:hover:bg-amber-500/5",
+        "group hover:bg-ledger-accent-soft/60 dark:hover:bg-ledger-accent/10 relative -mx-2 flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2 transition-colors",
         isExcluded && "opacity-40",
       )}
       onClick={onClick}
@@ -71,8 +71,8 @@ function BillRowItem({
         className={cn(
           "shrink-0 transition-all",
           isExcluded
-            ? "opacity-100 text-muted-foreground/60"
-            : "opacity-0 group-hover:opacity-100 text-muted-foreground/60 hover:text-muted-foreground",
+            ? "text-muted-foreground/60 opacity-100"
+            : "text-muted-foreground/60 hover:text-muted-foreground opacity-0 group-hover:opacity-100",
         )}
         onClick={(e) => {
           e.stopPropagation();
@@ -93,14 +93,14 @@ function BillRowItem({
         {!isExcluded && (
           <div
             className={cn(
-              "text-[11px]",
+              "font-mono text-[11px] tabular-nums",
               isDue
-                ? "text-amber-700 dark:text-amber-300"
+                ? "text-ledger-accent-strong dark:text-ledger-accent"
                 : "text-muted-foreground",
             )}
           >
             {isDue && (
-              <span className="mr-1 inline-block size-2 rounded-full bg-amber-400 dark:bg-amber-500 align-middle opacity-80" />
+              <span className="bg-ledger-accent mr-1 inline-block size-2 rounded-full align-middle opacity-80" />
             )}
             {formatUtcDate(bill.date, "MMM d")}
           </div>
@@ -108,7 +108,7 @@ function BillRowItem({
       </div>
 
       {/* Amount — fixed-width right-aligned column */}
-      <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums tracking-tight">
+      <span className="w-24 shrink-0 text-right font-mono text-sm font-semibold tracking-tight tabular-nums">
         {!isExcluded ? (
           bill.amount != null ? (
             formatPHP(bill.amount)
@@ -140,10 +140,7 @@ function BillListCard({
 }) {
   const [excludedBills, setExcludedBills] = useState<string[]>([]);
 
-  const sections = useMemo(
-    () => buildSections(bills, groups),
-    [bills, groups],
-  );
+  const sections = useMemo(() => buildSections(bills, groups), [bills, groups]);
 
   const outgoing = useMemo(
     () =>
@@ -177,23 +174,20 @@ function BillListCard({
   return (
     <div
       className={cn(
-        "relative flex flex-col overflow-hidden rounded-3xl border border-border/40 bg-card transition-shadow",
+        "border-border/40 bg-card relative flex flex-col overflow-hidden rounded-3xl border transition-shadow",
         "shadow-[0_2px_12px_-4px_rgba(0,0,0,0.08)] hover:shadow-[0_4px_20px_-6px_rgba(0,0,0,0.12)]",
-        // Warm tint layered over card surface
-        "bg-[linear-gradient(oklch(0.98_0.01_60/_0.35),oklch(0.98_0.01_60/_0.35))] dark:bg-[linear-gradient(oklch(0.22_0.01_40/_0.08),oklch(0.22_0.01_40/_0.08))]",
-        isCurrent &&
-          "ring-2 ring-amber-200/70 dark:ring-amber-500/20",
+        isCurrent && "ring-ledger-accent/40 dark:ring-ledger-accent/25 ring-2",
       )}
     >
       {/* Header */}
       <div className="px-5 pt-5 pb-3">
         {/* Date eyebrow row — current badge lives here */}
         <div className="mb-1.5 flex items-center gap-2">
-          <p className="text-sm text-muted-foreground tabular-nums">
+          <p className="text-muted-foreground font-mono text-sm tabular-nums">
             {dateLabel}
           </p>
           {isCurrent && (
-            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-medium text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
+            <span className="bg-ledger-accent-soft text-ledger-accent-strong dark:bg-ledger-accent/15 dark:text-ledger-accent rounded-full px-2.5 py-0.5 text-[11px] font-medium">
               This period
             </span>
           )}
@@ -202,12 +196,12 @@ function BillListCard({
         {/* Balance */}
         <p
           className={cn(
-            "text-3xl font-semibold tabular-nums tracking-tight",
+            "font-mono text-3xl font-semibold tracking-tight tabular-nums",
             balance > 0
               ? "text-teal-700 dark:text-teal-300"
               : balance < 0
                 ? "text-rose-600 dark:text-rose-400"
-                : "text-foreground",
+                : "text-ledger-ink",
           )}
         >
           {formatPHP(balance, "always")}
@@ -223,7 +217,7 @@ function BillListCard({
       <div className="flex-1 px-5 pb-5">
         {bills.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-8 text-center">
-            <Sparkles className="size-5 text-muted-foreground/40" />
+            <Sparkles className="text-muted-foreground/40 size-5" />
             <p className="text-muted-foreground text-sm">
               Nothing due this period
             </p>
@@ -241,7 +235,7 @@ function BillListCard({
               return (
                 <div
                   key={section.group?._id ?? "__ungrouped__"}
-                  className={cn(idx > 0 && "border-t border-border/40 pt-5")}
+                  className={cn(idx > 0 && "border-border/40 border-t pt-5")}
                 >
                   {/* Section header */}
                   <div className="mb-1 flex items-center justify-between">
@@ -260,11 +254,11 @@ function BillListCard({
                       <span className="text-foreground text-sm font-semibold">
                         {label}
                       </span>
-                      <span className="ml-0.5 rounded-full bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground tabular-nums">
+                      <span className="bg-muted/60 text-muted-foreground ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums">
                         {billCount}
                       </span>
                     </div>
-                    <span className="w-24 text-right text-sm font-medium tabular-nums tracking-tight">
+                    <span className="w-24 text-right font-mono text-sm font-medium tracking-tight tabular-nums">
                       {formatPHP(subtotal)}
                     </span>
                   </div>
