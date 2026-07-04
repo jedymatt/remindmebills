@@ -127,6 +127,11 @@ export function BillFormFields({
     setUseCustomFrequency(false);
     form.setValue("recurrence.type", preset.type);
     form.setValue("recurrence.interval", preset.interval);
+    // A named preset is a plain cadence, so drop any day-of-month pinning a
+    // legacy/imported bill carried. Otherwise the stale bymonthday makes
+    // presetFor return null (dropdown snaps back to "Custom") and persists an
+    // inconsistent recurrence that mis-fires through the bymonthday branch.
+    form.setValue("recurrence.bymonthday", undefined);
   };
 
   const handleInternalSubmit = (data: BillFormValues) => {
