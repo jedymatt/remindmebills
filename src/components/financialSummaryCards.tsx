@@ -18,6 +18,8 @@ import {
   localDateToUtcDateOnly,
   utcDateOnlyToLocal,
 } from "~/lib/date-utils";
+import { buildPaidLookup, isOccurrencePaid } from "~/lib/payment-utils";
+import { api } from "~/trpc/react";
 import type { BillEvent, IncomeProfile } from "~/types";
 
 function formatPHP(value: number) {
@@ -27,12 +29,11 @@ function formatPHP(value: number) {
   });
 }
 
-// Color the balance by sign so it agrees with the bill list's money semantics:
-// teal reads as "ahead", rose as "short".
-function balanceToneClass(balance: number) {
-  if (balance > 0) return "text-teal-700 dark:text-teal-300";
-  if (balance < 0) return "text-rose-600 dark:text-rose-400";
-  return "text-ledger-ink";
+// Fully paid reads as "all clear" (teal); anything still owed stays neutral ink.
+function remainingToneClass(remaining: number) {
+  return remaining === 0
+    ? "text-teal-700 dark:text-teal-300"
+    : "text-ledger-ink";
 }
 
 type SummaryCard = {
@@ -51,30 +52,40 @@ export function FinancialSummaryCards({
   incomeProfile: IncomeProfile;
   bills: BillEvent[];
 }) {
-  const { currentPeriodBills, nextBill } = useMemo(() => {
+  const { data: payments } = api.payment.getAll.useQuery();
+  const paidKeys = useMemo(() => buildPaidLookup(payments ?? []), [payments]);
+
+  const { remaining, nextBill } = useMemo(() => {
     const payRule = createPayRule(incomeProfile);
     const currentPay = payRule.before(localDateToUtcDateOnly(new Date()), true);
-    if (!currentPay) return { currentPeriodBills: [], nextBill: null };
+    if (!currentPay) return { remaining: 0, nextBill: null };
 
     const nextPayDate = payRule.after(currentPay);
-    if (!nextPayDate) return { currentPeriodBills: [], nextBill: null };
+    if (!nextPayDate) return { remaining: 0, nextBill: null };
 
     const periodBills = computeBillsInPeriod(bills, currentPay, nextPayDate);
 
-    // Find the nearest upcoming bill (today or future). Compare on day
-    // granularity: bill dates are at midnight, so `b.date >= new Date()` would
-    // drop a bill due today once the wall clock passes midnight.
-    const today = startOfDay(new Date());
-    const upcoming = periodBills.find(
-      (b) => utcDateOnlyToLocal(b.date) >= today,
+    // What's still owed this period — paid occurrences contribute 0. A plain
+    // remaining-to-pay total (no income term), so it stays coherent and shrinks
+    // toward ₱0 as bills are marked paid, whatever the income is.
+    const remaining = sumBy(periodBills, (b) =>
+      isOccurrencePaid(paidKeys, b._id, b.date) ? 0 : (b.amount ?? 0),
     );
 
-    return { currentPeriodBills: periodBills, nextBill: upcoming ?? null };
-  }, [incomeProfile, bills]);
+    // Nearest upcoming *unpaid* bill (today or future). Day-granularity compare:
+    // bill dates are at midnight, so `b.date >= new Date()` would drop a bill due
+    // today once the wall clock passes midnight.
+    const today = startOfDay(new Date());
+    const upcoming = periodBills.find(
+      (b) =>
+        utcDateOnlyToLocal(b.date) >= today &&
+        !isOccurrencePaid(paidKeys, b._id, b.date),
+    );
+
+    return { remaining, nextBill: upcoming ?? null };
+  }, [incomeProfile, bills, paidKeys]);
 
   const income = incomeProfile.amount ?? 0;
-  const totalBillAmount = sumBy(currentPeriodBills, (b) => b.amount ?? 0);
-  const balance = income - totalBillAmount;
 
   const cards: SummaryCard[] = [
     {
@@ -93,11 +104,11 @@ export function FinancialSummaryCards({
     },
     {
       icon: PiggyBank,
-      label: "Balance",
-      value: formatPHP(balance),
-      subtitle: "This period",
+      label: "Remaining",
+      value: formatPHP(remaining),
+      subtitle: "Left to pay this period",
       mono: true,
-      valueClassName: balanceToneClass(balance),
+      valueClassName: remainingToneClass(remaining),
     },
     {
       icon: CalendarClock,

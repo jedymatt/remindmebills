@@ -49,3 +49,13 @@ export interface Group {
   name: string;
   order: number;
 }
+
+// A settled occurrence of a bill. `occurrenceDate` is the UTC-midnight day-key
+// that lines up with a scheduler-generated occurrence (see date-utils.ts).
+export interface Payment {
+  _id: string;
+  userId: string;
+  billId: string;
+  occurrenceDate: Date;
+  paidAt: Date;
+}
