@@ -1,9 +1,26 @@
 # Design: Mark bill occurrences as paid — Issue #34
 
-- **Status:** Approved design (v1 scope)
+- **Status:** Approved design (v1 scope) — **revised after code review, see below**
 - **Date:** 2026-07-04
 - **Branch:** `feat/mark-bill-occurrences-paid`
 - **Issue:** #34 — *feat: mark bill occurrences as paid + payment history*
+
+> **Post-review revision (2026-07-04).** An xhigh code review found the original
+> "paid drops from *every* sum" money-math rule (below) to be incoherent: removing
+> paid bills from the period `outgoing` without also crediting income inflated the
+> balance and could flip "short" → "ahead". The coherent income-relative balance is
+> paid-invariant, so the implementation instead:
+> - keeps paid occurrences **in** the per-period card sums (`balance = income − all
+>   bills`, a stable projection); paid is shown there only as a struck-through row;
+> - renames the summary **"Balance"** card to **"Remaining"** = sum of *unpaid* bills
+>   (no income term), which shrinks toward ₱0 as bills are paid.
+>
+> The review also drove: cascade-deleting a bill's payments on `bill.delete`;
+> disabling the paid toggle through the refetch (stale-cache race); using the
+> per-occurrence key as the React list key; UTC-midnight-truncating the client
+> occurrence key; and dropping the unused `amountPaid` input. Deferred follow-ups:
+> unique index on the payments identity, bounding `payment.getAll` to the visible
+> window, and re-keying payments when a bill's schedule is edited.
 
 ## Problem
 
