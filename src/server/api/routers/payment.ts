@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { ObjectId, type Db, type WithoutId } from "mongodb";
 import { z } from "zod";
+import { truncateToUtcDateOnly } from "~/lib/date-utils";
 import type { Payment as SerializedPayment } from "~/types";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -25,22 +26,13 @@ function serializePayment(payment: PaymentDoc): SerializedPayment {
   };
 }
 
-// Truncate an occurrence instant to UTC midnight of its calendar day, so the
-// stored key sits in the same UTC-naive frame the scheduler generates
-// occurrences in (see date-utils.ts). Without this a paid marker could miss its
-// occurrence by a sub-day offset.
-function toOccurrenceKey(date: Date): Date {
-  return new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
-  );
-}
-
 // Confirms the bill exists and belongs to the requesting user before a payment
-// is attached to it — mirrors the ownership check in the bill router.
+// is attached to it — mirrors the ownership check in the bill router. Returns the
+// resolved ids so callers don't re-parse them.
 async function assertBillOwned(
   ctx: { db: Db; session: { user: { id: string } } },
   billId: string,
-): Promise<ObjectId> {
+): Promise<{ billOid: ObjectId; userOid: ObjectId }> {
   if (!ObjectId.isValid(billId)) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Bill not found" });
   }
@@ -55,7 +47,7 @@ async function assertBillOwned(
     throw new TRPCError({ code: "NOT_FOUND", message: "Bill not found" });
   }
 
-  return billOid;
+  return { billOid, userOid };
 }
 
 export const paymentRouter = createTRPCRouter({
@@ -71,19 +63,15 @@ export const paymentRouter = createTRPCRouter({
   markPaid: protectedProcedure
     .input(z.object({ billId: z.string(), occurrenceDate: z.date() }))
     .mutation(async ({ ctx, input }) => {
-      const billOid = await assertBillOwned(ctx, input.billId);
-      const occurrenceDate = toOccurrenceKey(input.occurrenceDate);
+      const { billOid, userOid } = await assertBillOwned(ctx, input.billId);
+      const occurrenceDate = truncateToUtcDateOnly(input.occurrenceDate);
 
       // Upsert on the (userId, billId, occurrenceDate) identity so re-marking the
       // same occurrence refreshes paidAt rather than adding a row. Without a
       // unique index, truly concurrent upserts can still race to insert
       // duplicates — deferred; markUnpaid's deleteMany clears any that appear.
       await ctx.db.collection<WithoutId<PaymentDoc>>("payments").updateOne(
-        {
-          userId: new ObjectId(ctx.session.user.id),
-          billId: billOid,
-          occurrenceDate,
-        },
+        { userId: userOid, billId: billOid, occurrenceDate },
         { $set: { paidAt: new Date() } },
         { upsert: true },
       );
@@ -91,14 +79,14 @@ export const paymentRouter = createTRPCRouter({
   markUnpaid: protectedProcedure
     .input(z.object({ billId: z.string(), occurrenceDate: z.date() }))
     .mutation(async ({ ctx, input }) => {
-      const billOid = await assertBillOwned(ctx, input.billId);
+      const { billOid, userOid } = await assertBillOwned(ctx, input.billId);
 
       // deleteMany (not deleteOne) self-heals any duplicate a concurrent
       // upsert race may have created, so unmarking always fully clears it.
       await ctx.db.collection<PaymentDoc>("payments").deleteMany({
-        userId: new ObjectId(ctx.session.user.id),
+        userId: userOid,
         billId: billOid,
-        occurrenceDate: toOccurrenceKey(input.occurrenceDate),
+        occurrenceDate: truncateToUtcDateOnly(input.occurrenceDate),
       });
     }),
 });

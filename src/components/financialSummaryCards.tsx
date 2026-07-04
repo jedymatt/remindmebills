@@ -55,19 +55,26 @@ export function FinancialSummaryCards({
   const { data: payments } = api.payment.getAll.useQuery();
   const paidKeys = useMemo(() => buildPaidLookup(payments ?? []), [payments]);
 
-  const { currentPeriodBills, nextBill } = useMemo(() => {
+  const { remaining, nextBill } = useMemo(() => {
     const payRule = createPayRule(incomeProfile);
     const currentPay = payRule.before(localDateToUtcDateOnly(new Date()), true);
-    if (!currentPay) return { currentPeriodBills: [], nextBill: null };
+    if (!currentPay) return { remaining: 0, nextBill: null };
 
     const nextPayDate = payRule.after(currentPay);
-    if (!nextPayDate) return { currentPeriodBills: [], nextBill: null };
+    if (!nextPayDate) return { remaining: 0, nextBill: null };
 
     const periodBills = computeBillsInPeriod(bills, currentPay, nextPayDate);
 
-    // Find the nearest upcoming *unpaid* bill (today or future). Compare on day
-    // granularity: bill dates are at midnight, so `b.date >= new Date()` would
-    // drop a bill due today once the wall clock passes midnight.
+    // What's still owed this period — paid occurrences contribute 0. A plain
+    // remaining-to-pay total (no income term), so it stays coherent and shrinks
+    // toward ₱0 as bills are marked paid, whatever the income is.
+    const remaining = sumBy(periodBills, (b) =>
+      isOccurrencePaid(paidKeys, b._id, b.date) ? 0 : (b.amount ?? 0),
+    );
+
+    // Nearest upcoming *unpaid* bill (today or future). Day-granularity compare:
+    // bill dates are at midnight, so `b.date >= new Date()` would drop a bill due
+    // today once the wall clock passes midnight.
     const today = startOfDay(new Date());
     const upcoming = periodBills.find(
       (b) =>
@@ -75,17 +82,10 @@ export function FinancialSummaryCards({
         !isOccurrencePaid(paidKeys, b._id, b.date),
     );
 
-    return { currentPeriodBills: periodBills, nextBill: upcoming ?? null };
+    return { remaining, nextBill: upcoming ?? null };
   }, [incomeProfile, bills, paidKeys]);
 
   const income = incomeProfile.amount ?? 0;
-  // What's still owed this period — paid occurrences drop out. This is a plain
-  // remaining-to-pay total (no income term), so it stays coherent and shrinks
-  // toward ₱0 as bills are marked paid, whatever the income is.
-  const remaining = sumBy(
-    currentPeriodBills.filter((b) => !isOccurrencePaid(paidKeys, b._id, b.date)),
-    (b) => b.amount ?? 0,
-  );
 
   const cards: SummaryCard[] = [
     {

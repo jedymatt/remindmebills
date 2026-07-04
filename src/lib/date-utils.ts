@@ -37,6 +37,20 @@ export function utcDateOnlyToLocal(utc: Date): Date {
   return new Date(utc.getUTCFullYear(), utc.getUTCMonth(), utc.getUTCDate());
 }
 
+/**
+ * Floor a `Date` to UTC midnight of its own UTC calendar day. Unlike
+ * `localDateToUtcDateOnly` (which reads local fields) this keeps the UTC day, and
+ * unlike `roundToUtcDateOnly` it floors rather than rounds. It's the canonical
+ * key for occurrences in the UTC-naive frame: the client occurrence key and the
+ * server-stored payment date both pass through it, so their days stay
+ * byte-identical for the in-memory paid-state join.
+ */
+export function truncateToUtcDateOnly(date: Date): Date {
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  );
+}
+
 /** Format a canonical (UTC-midnight) value by its calendar day, timezone-stably. */
 export function formatUtcDate(date: Date, formatStr: string): string {
   return format(utcDateOnlyToLocal(date), formatStr);

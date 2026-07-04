@@ -1,3 +1,4 @@
+import { truncateToUtcDateOnly } from "~/lib/date-utils";
 import type { Payment } from "~/types";
 
 // Occurrences are generated client-side from recurrence rules, and paid-state
@@ -10,21 +11,14 @@ import type { Payment } from "~/types";
 /**
  * Stable composite key identifying one occurrence of a bill.
  *
- * The date is truncated to its UTC-midnight epoch — matching the server's
- * `toOccurrenceKey` (payment.ts) — so the read-side key lines up with the stored
- * payment even if a bill's date ever carries a sub-day time component. Keying off
- * UTC fields keeps it timezone-stable (reading local fields would shift the day
- * for users east/west of UTC — the date-only-as-instant trap; see date-utils.ts).
- * The `:` separator can't appear in a hex ObjectId string, so bill and day never
- * collide.
+ * The date is floored to its UTC-midnight day via the shared
+ * `truncateToUtcDateOnly` — the same helper the server applies before storing a
+ * payment — so the read-side key lines up with the stored day even if a bill's
+ * date ever carries a sub-day time component. The `:` separator can't appear in a
+ * hex ObjectId string, so bill and day never collide.
  */
 export function occurrenceKey(billId: string, occurrenceDate: Date): string {
-  const utcMidnight = Date.UTC(
-    occurrenceDate.getUTCFullYear(),
-    occurrenceDate.getUTCMonth(),
-    occurrenceDate.getUTCDate(),
-  );
-  return `${billId}:${utcMidnight}`;
+  return `${billId}:${truncateToUtcDateOnly(occurrenceDate).getTime()}`;
 }
 
 /** Build the O(1) lookup of paid occurrences from the user's payment set. */
