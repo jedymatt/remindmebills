@@ -109,8 +109,8 @@ export function BillFormFields({
   });
 
   const activePreset = presetFor({
-    type: formRecurrenceType ?? "monthly",
-    interval: formRecurrenceInterval ?? 1,
+    type: formRecurrenceType,
+    interval: formRecurrenceInterval,
     bymonthday: formRecurrenceBymonthday,
   });
   const frequencyValue = useCustomFrequency
@@ -268,7 +268,7 @@ export function BillFormFields({
                 </SelectContent>
               </Select>
             </div>
-            {useCustomFrequency && (
+            {frequencyValue === "custom" && (
               <>
                 <FormField
                   control={form.control}

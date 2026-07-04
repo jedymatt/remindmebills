@@ -43,11 +43,15 @@ interface RecurrenceLike {
 }
 
 /**
- * Returns the named preset a recurrence corresponds to, or null when it's a
- * custom cadence (an arbitrary interval, or one pinned to specific month-days)
- * that doesn't map to a named option.
+ * Returns the named preset a recurrence corresponds to, or null when it maps to
+ * no named option — an arbitrary interval, one pinned to specific month-days, or
+ * a recurrence whose type/interval isn't set yet (e.g. before a cadence is
+ * chosen).
  */
-export function presetFor(recurrence: RecurrenceLike): FrequencyPreset | null {
+export function presetFor(
+  recurrence: Partial<RecurrenceLike>,
+): FrequencyPreset | null {
+  if (recurrence.type == null || recurrence.interval == null) return null;
   if (recurrence.bymonthday && recurrence.bymonthday.length > 0) return null;
   return (
     FREQUENCY_PRESETS.find(
