@@ -2,11 +2,23 @@
 
 import { isSameDay, subDays } from "date-fns";
 import { sumBy } from "lodash";
-import { EyeClosedIcon, EyeIcon, Sparkles } from "lucide-react";
+import {
+  Circle,
+  CircleCheckBig,
+  EyeClosedIcon,
+  EyeIcon,
+  Sparkles,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { BillModal } from "~/components/billModal";
 import { getPayPeriodsByCount } from "~/lib/bill-utils";
 import { formatUtcDate } from "~/lib/date-utils";
+import {
+  buildPaidLookup,
+  isOccurrencePaid,
+  occurrenceKey,
+} from "~/lib/payment-utils";
 import { UNGROUPED_COLOR, colorForOrder } from "~/lib/group-colors";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
@@ -46,14 +58,20 @@ function BillRowItem({
   bill,
   payDate,
   isExcluded,
+  isPaid,
+  isPaidPending,
   onClick,
   onToggleExclude,
+  onTogglePaid,
 }: {
   bill: BillRow;
   payDate: Date;
   isExcluded: boolean;
+  isPaid: boolean;
+  isPaidPending: boolean;
   onClick: () => void;
   onToggleExclude: () => void;
+  onTogglePaid: () => void;
 }) {
   const isDue = isSameDay(bill.date, payDate);
 
@@ -61,10 +79,35 @@ function BillRowItem({
     <li
       className={cn(
         "group hover:bg-ledger-accent-soft/60 dark:hover:bg-ledger-accent/10 relative -mx-2 flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2 transition-colors",
-        isExcluded && "opacity-40",
+        (isExcluded || isPaid) && "opacity-40",
       )}
       onClick={onClick}
     >
+      {/* Paid toggle — persistent settled state. Always visible; disabled
+          while its mutation is in flight. */}
+      <button
+        type="button"
+        className={cn(
+          "shrink-0 transition-colors disabled:opacity-50",
+          isPaid
+            ? "text-ledger-accent-strong dark:text-ledger-accent"
+            : "text-muted-foreground/50 hover:text-muted-foreground",
+        )}
+        onClick={(e) => {
+          e.stopPropagation();
+          onTogglePaid();
+        }}
+        disabled={isPaidPending}
+        aria-label={isPaid ? "Mark unpaid" : "Mark paid"}
+        aria-pressed={isPaid}
+      >
+        {isPaid ? (
+          <CircleCheckBig className="size-4" />
+        ) : (
+          <Circle className="size-4" />
+        )}
+      </button>
+
       {/* Eye toggle — always visible when excluded. Otherwise visible by
           default (so it's reachable on touch), and only reveal-on-hover on
           devices that actually support hover. */}
@@ -109,8 +152,13 @@ function BillRowItem({
         )}
       </div>
 
-      {/* Amount — fixed-width right-aligned column */}
-      <span className="w-24 shrink-0 text-right font-mono text-sm font-semibold tracking-tight tabular-nums">
+      {/* Amount — fixed-width right-aligned column; struck through when paid */}
+      <span
+        className={cn(
+          "w-24 shrink-0 text-right font-mono text-sm font-semibold tracking-tight tabular-nums",
+          isPaid && "line-through",
+        )}
+      >
         {!isExcluded ? (
           bill.amount != null ? (
             formatPHP(bill.amount)
@@ -130,7 +178,10 @@ function BillListCard({
   after,
   isCurrent,
   ingoing,
+  paidKeys,
+  pendingKeys,
   onBillClick,
+  onTogglePaid,
 }: {
   bills: BillRow[];
   groups: Group[];
@@ -138,7 +189,10 @@ function BillListCard({
   after: Date | null;
   isCurrent: boolean;
   ingoing: number;
+  paidKeys: Set<string>;
+  pendingKeys: Set<string>;
   onBillClick: (billId: string) => void;
+  onTogglePaid: (bill: BillRow) => void;
 }) {
   const [excludedBills, setExcludedBills] = useState<string[]>([]);
 
@@ -147,10 +201,14 @@ function BillListCard({
   const outgoing = useMemo(
     () =>
       sumBy(
-        bills.filter((bill) => !excludedBills.includes(bill._id)),
+        bills.filter(
+          (bill) =>
+            !excludedBills.includes(bill._id) &&
+            !isOccurrencePaid(paidKeys, bill._id, bill.date),
+        ),
         (bill) => bill.amount ?? 0,
       ),
-    [bills, excludedBills],
+    [bills, excludedBills, paidKeys],
   );
 
   const balance = ingoing - outgoing;
@@ -165,7 +223,11 @@ function BillListCard({
 
   const subtotalFor = (sectionBills: BillRow[]) =>
     sumBy(
-      sectionBills.filter((b) => !excludedBills.includes(b._id)),
+      sectionBills.filter(
+        (b) =>
+          !excludedBills.includes(b._id) &&
+          !isOccurrencePaid(paidKeys, b._id, b.date),
+      ),
       (b) => b.amount ?? 0,
     );
 
@@ -267,16 +329,22 @@ function BillListCard({
 
                   {/* Bill rows */}
                   <ul>
-                    {section.bills.map((bill) => (
-                      <BillRowItem
-                        key={bill._id}
-                        bill={bill}
-                        payDate={payDate}
-                        isExcluded={excludedBills.includes(bill._id)}
-                        onClick={() => onBillClick(bill._id)}
-                        onToggleExclude={() => toggleExclude(bill._id)}
-                      />
-                    ))}
+                    {section.bills.map((bill) => {
+                      const key = occurrenceKey(bill._id, bill.date);
+                      return (
+                        <BillRowItem
+                          key={bill._id}
+                          bill={bill}
+                          payDate={payDate}
+                          isExcluded={excludedBills.includes(bill._id)}
+                          isPaid={paidKeys.has(key)}
+                          isPaidPending={pendingKeys.has(key)}
+                          onClick={() => onBillClick(bill._id)}
+                          onToggleExclude={() => toggleExclude(bill._id)}
+                          onTogglePaid={() => onTogglePaid(bill)}
+                        />
+                      );
+                    })}
                   </ul>
                 </div>
               );
@@ -295,10 +363,17 @@ export function BillList() {
   const { data: bills } = api.bill.getAll.useQuery();
   const { data: incomeProfile } = api.income.getIncomeProfile.useQuery();
   const { data: groups } = api.group.getAll.useQuery();
+  const { data: payments } = api.payment.getAll.useQuery();
+  const utils = api.useUtils();
+  const markPaid = api.payment.markPaid.useMutation();
+  const markUnpaid = api.payment.markUnpaid.useMutation();
+  const [pendingKeys, setPendingKeys] = useState<Set<string>>(new Set());
   const [selectedBillId, setSelectedBillId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PERIODS_INITIAL);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  const paidKeys = useMemo(() => buildPaidLookup(payments ?? []), [payments]);
 
   const billsInPayPeriod = useMemo(() => {
     if (!bills || !incomeProfile) return [];
@@ -329,6 +404,27 @@ export function BillList() {
     setModalOpen(true);
   };
 
+  const handleTogglePaid = (bill: BillRow) => {
+    const key = occurrenceKey(bill._id, bill.date);
+    const currentlyPaid = paidKeys.has(key);
+    setPendingKeys((prev) => new Set(prev).add(key));
+    const mutation = currentlyPaid ? markUnpaid : markPaid;
+    mutation.mutate(
+      { billId: bill._id, occurrenceDate: bill.date },
+      {
+        onSuccess: () => void utils.payment.getAll.invalidate(),
+        onError: (error) =>
+          toast.error(error.message || "Failed to update payment"),
+        onSettled: () =>
+          setPendingKeys((prev) => {
+            const next = new Set(prev);
+            next.delete(key);
+            return next;
+          }),
+      },
+    );
+  };
+
   return (
     <>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -341,7 +437,10 @@ export function BillList() {
             after={after}
             isCurrent={index === 0}
             ingoing={ingoing}
+            paidKeys={paidKeys}
+            pendingKeys={pendingKeys}
             onBillClick={handleBillClick}
+            onTogglePaid={handleTogglePaid}
           />
         ))}
       </div>
