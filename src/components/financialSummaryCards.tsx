@@ -18,6 +18,8 @@ import {
   localDateToUtcDateOnly,
   utcDateOnlyToLocal,
 } from "~/lib/date-utils";
+import { buildPaidLookup, isOccurrencePaid } from "~/lib/payment-utils";
+import { api } from "~/trpc/react";
 import type { BillEvent, IncomeProfile } from "~/types";
 
 function formatPHP(value: number) {
@@ -51,6 +53,9 @@ export function FinancialSummaryCards({
   incomeProfile: IncomeProfile;
   bills: BillEvent[];
 }) {
+  const { data: payments } = api.payment.getAll.useQuery();
+  const paidKeys = useMemo(() => buildPaidLookup(payments ?? []), [payments]);
+
   const { currentPeriodBills, nextBill } = useMemo(() => {
     const payRule = createPayRule(incomeProfile);
     const currentPay = payRule.before(localDateToUtcDateOnly(new Date()), true);
@@ -61,19 +66,25 @@ export function FinancialSummaryCards({
 
     const periodBills = computeBillsInPeriod(bills, currentPay, nextPayDate);
 
-    // Find the nearest upcoming bill (today or future). Compare on day
+    // Find the nearest upcoming *unpaid* bill (today or future). Compare on day
     // granularity: bill dates are at midnight, so `b.date >= new Date()` would
     // drop a bill due today once the wall clock passes midnight.
     const today = startOfDay(new Date());
     const upcoming = periodBills.find(
-      (b) => utcDateOnlyToLocal(b.date) >= today,
+      (b) =>
+        utcDateOnlyToLocal(b.date) >= today &&
+        !isOccurrencePaid(paidKeys, b._id, b.date),
     );
 
     return { currentPeriodBills: periodBills, nextBill: upcoming ?? null };
-  }, [incomeProfile, bills]);
+  }, [incomeProfile, bills, paidKeys]);
 
   const income = incomeProfile.amount ?? 0;
-  const totalBillAmount = sumBy(currentPeriodBills, (b) => b.amount ?? 0);
+  // Remaining balance reflects only what's still owed — paid occurrences drop out.
+  const totalBillAmount = sumBy(
+    currentPeriodBills.filter((b) => !isOccurrencePaid(paidKeys, b._id, b.date)),
+    (b) => b.amount ?? 0,
+  );
   const balance = income - totalBillAmount;
 
   const cards: SummaryCard[] = [
