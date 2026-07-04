@@ -29,12 +29,11 @@ function formatPHP(value: number) {
   });
 }
 
-// Color the balance by sign so it agrees with the bill list's money semantics:
-// teal reads as "ahead", rose as "short".
-function balanceToneClass(balance: number) {
-  if (balance > 0) return "text-teal-700 dark:text-teal-300";
-  if (balance < 0) return "text-rose-600 dark:text-rose-400";
-  return "text-ledger-ink";
+// Fully paid reads as "all clear" (teal); anything still owed stays neutral ink.
+function remainingToneClass(remaining: number) {
+  return remaining === 0
+    ? "text-teal-700 dark:text-teal-300"
+    : "text-ledger-ink";
 }
 
 type SummaryCard = {
@@ -80,12 +79,13 @@ export function FinancialSummaryCards({
   }, [incomeProfile, bills, paidKeys]);
 
   const income = incomeProfile.amount ?? 0;
-  // Remaining balance reflects only what's still owed — paid occurrences drop out.
-  const totalBillAmount = sumBy(
+  // What's still owed this period — paid occurrences drop out. This is a plain
+  // remaining-to-pay total (no income term), so it stays coherent and shrinks
+  // toward ₱0 as bills are marked paid, whatever the income is.
+  const remaining = sumBy(
     currentPeriodBills.filter((b) => !isOccurrencePaid(paidKeys, b._id, b.date)),
     (b) => b.amount ?? 0,
   );
-  const balance = income - totalBillAmount;
 
   const cards: SummaryCard[] = [
     {
@@ -104,11 +104,11 @@ export function FinancialSummaryCards({
     },
     {
       icon: PiggyBank,
-      label: "Balance",
-      value: formatPHP(balance),
-      subtitle: "This period",
+      label: "Remaining",
+      value: formatPHP(remaining),
+      subtitle: "Left to pay this period",
       mono: true,
-      valueClassName: balanceToneClass(balance),
+      valueClassName: remainingToneClass(remaining),
     },
     {
       icon: CalendarClock,

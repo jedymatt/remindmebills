@@ -14,11 +14,7 @@ import { toast } from "sonner";
 import { BillModal } from "~/components/billModal";
 import { getPayPeriodsByCount } from "~/lib/bill-utils";
 import { formatUtcDate } from "~/lib/date-utils";
-import {
-  buildPaidLookup,
-  isOccurrencePaid,
-  occurrenceKey,
-} from "~/lib/payment-utils";
+import { buildPaidLookup, occurrenceKey } from "~/lib/payment-utils";
 import { UNGROUPED_COLOR, colorForOrder } from "~/lib/group-colors";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
@@ -198,17 +194,16 @@ function BillListCard({
 
   const sections = useMemo(() => buildSections(bills, groups), [bills, groups]);
 
+  // Paid occurrences stay in the period sums — the card balance is a stable
+  // income−all-bills projection, not "cash left". Paid is shown as a struck row;
+  // "remaining to pay" lives in the summary cards instead.
   const outgoing = useMemo(
     () =>
       sumBy(
-        bills.filter(
-          (bill) =>
-            !excludedBills.includes(bill._id) &&
-            !isOccurrencePaid(paidKeys, bill._id, bill.date),
-        ),
+        bills.filter((bill) => !excludedBills.includes(bill._id)),
         (bill) => bill.amount ?? 0,
       ),
-    [bills, excludedBills, paidKeys],
+    [bills, excludedBills],
   );
 
   const balance = ingoing - outgoing;
@@ -223,11 +218,7 @@ function BillListCard({
 
   const subtotalFor = (sectionBills: BillRow[]) =>
     sumBy(
-      sectionBills.filter(
-        (b) =>
-          !excludedBills.includes(b._id) &&
-          !isOccurrencePaid(paidKeys, b._id, b.date),
-      ),
+      sectionBills.filter((b) => !excludedBills.includes(b._id)),
       (b) => b.amount ?? 0,
     );
 
