@@ -13,7 +13,6 @@ type PaymentDoc = {
   userId: ObjectId;
   billId: ObjectId;
   occurrenceDate: Date;
-  amountPaid?: number;
   paidAt: Date;
 };
 
@@ -70,29 +69,22 @@ export const paymentRouter = createTRPCRouter({
     return payments.map(serializePayment);
   }),
   markPaid: protectedProcedure
-    .input(
-      z.object({
-        billId: z.string(),
-        occurrenceDate: z.date(),
-        amountPaid: z.number().min(0).optional(),
-      }),
-    )
+    .input(z.object({ billId: z.string(), occurrenceDate: z.date() }))
     .mutation(async ({ ctx, input }) => {
       const billOid = await assertBillOwned(ctx, input.billId);
       const occurrenceDate = toOccurrenceKey(input.occurrenceDate);
 
-      // Upsert on the (userId, billId, occurrenceDate) identity so marking the
-      // same occurrence paid twice refreshes paidAt instead of duplicating.
-      const set: Record<string, unknown> = { paidAt: new Date() };
-      if (input.amountPaid != null) set.amountPaid = input.amountPaid;
-
+      // Upsert on the (userId, billId, occurrenceDate) identity so re-marking the
+      // same occurrence refreshes paidAt rather than adding a row. Without a
+      // unique index, truly concurrent upserts can still race to insert
+      // duplicates — deferred; markUnpaid's deleteMany clears any that appear.
       await ctx.db.collection<WithoutId<PaymentDoc>>("payments").updateOne(
         {
           userId: new ObjectId(ctx.session.user.id),
           billId: billOid,
           occurrenceDate,
         },
-        { $set: set },
+        { $set: { paidAt: new Date() } },
         { upsert: true },
       );
     }),

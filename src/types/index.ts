@@ -57,6 +57,5 @@ export interface Payment {
   userId: string;
   billId: string;
   occurrenceDate: Date;
-  amountPaid?: number;
   paidAt: Date;
 }

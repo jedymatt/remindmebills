@@ -333,7 +333,7 @@ function BillListCard({
                       const key = occurrenceKey(bill._id, bill.date);
                       return (
                         <BillRowItem
-                          key={bill._id}
+                          key={key}
                           bill={bill}
                           payDate={payDate}
                           isExcluded={excludedBills.includes(bill._id)}
@@ -408,19 +408,26 @@ export function BillList() {
     const key = occurrenceKey(bill._id, bill.date);
     const currentlyPaid = paidKeys.has(key);
     setPendingKeys((prev) => new Set(prev).add(key));
+    const clearPending = () =>
+      setPendingKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
     const mutation = currentlyPaid ? markUnpaid : markPaid;
     mutation.mutate(
       { billId: bill._id, occurrenceDate: bill.date },
       {
-        onSuccess: () => void utils.payment.getAll.invalidate(),
-        onError: (error) =>
-          toast.error(error.message || "Failed to update payment"),
-        onSettled: () =>
-          setPendingKeys((prev) => {
-            const next = new Set(prev);
-            next.delete(key);
-            return next;
-          }),
+        // Keep the row disabled until the refetch lands (invalidate resolves
+        // after it), not just the mutation response — otherwise paidKeys is
+        // still stale when the button re-enables and a fast re-click fires the
+        // same-direction mutation again.
+        onSuccess: () =>
+          void utils.payment.getAll.invalidate().finally(clearPending),
+        onError: (error) => {
+          toast.error(error.message || "Failed to update payment");
+          clearPending();
+        },
       },
     );
   };

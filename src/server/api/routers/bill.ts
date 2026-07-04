@@ -128,14 +128,21 @@ export const billRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Bill not found" });
       }
 
-      const result = await ctx.db.collection("bills").deleteOne({
-        _id: new ObjectId(input.id),
-        userId: new ObjectId(ctx.session.user.id),
-      });
+      const billOid = new ObjectId(input.id);
+      const userOid = new ObjectId(ctx.session.user.id);
+      const result = await ctx.db
+        .collection("bills")
+        .deleteOne({ _id: billOid, userId: userOid });
 
       if (result.deletedCount === 0) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Bill not found" });
       }
+
+      // Cascade: drop any paid-occurrence markers for this bill so they don't
+      // orphan in the payments collection.
+      await ctx.db
+        .collection("payments")
+        .deleteMany({ userId: userOid, billId: billOid });
     }),
   create: protectedProcedure
     .input(InputBillSchema)
