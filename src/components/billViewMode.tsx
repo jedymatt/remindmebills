@@ -4,6 +4,7 @@ import { Calendar, Loader2, Repeat } from "lucide-react";
 import { toast } from "sonner";
 import { formatUtcDate } from "~/lib/date-utils";
 import { colorForOrder } from "~/lib/group-colors";
+import { formatRecurrence } from "~/lib/recurrence";
 import { api } from "~/trpc/react";
 import type { BillEvent } from "~/types";
 import { Badge } from "./ui/badge";
@@ -148,14 +149,7 @@ export function BillViewMode({ bill, onEdit, onDelete }: BillViewModeProps) {
                 Recurrence Pattern
               </label>
               <p className="font-medium">
-                Every {bill.recurrence.interval}{" "}
-                {bill.recurrence.type === "weekly"
-                  ? bill.recurrence.interval === 1
-                    ? "week"
-                    : "weeks"
-                  : bill.recurrence.interval === 1
-                    ? "month"
-                    : "months"}
+                {formatRecurrence(bill.recurrence)}
               </p>
             </div>
 

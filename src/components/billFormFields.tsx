@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { useWatch, type UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 import { api } from "~/trpc/react";
 import { colorForOrder } from "~/lib/group-colors";
+import { FREQUENCY_PRESETS, presetFor } from "~/lib/recurrence";
 import { DateInput } from "./dateInput";
 import {
   Form,
@@ -84,10 +86,48 @@ export function BillFormFields({
   });
   const groups = groupsData ?? [];
 
-  const [formType, formRecurrenceType] = useWatch({
-    name: ["type", "recurrence.type"],
+  const [
+    formType,
+    formRecurrenceType,
+    formRecurrenceInterval,
+    formRecurrenceBymonthday,
+  ] = useWatch({
+    name: [
+      "type",
+      "recurrence.type",
+      "recurrence.interval",
+      "recurrence.bymonthday",
+    ],
     control: form.control,
   });
+
+  // Legacy bills can carry an arbitrary interval (e.g. every 3 weeks) that maps
+  // to no named cadence; open those directly in the custom editor.
+  const [useCustomFrequency, setUseCustomFrequency] = useState(() => {
+    const recurrence = form.getValues("recurrence");
+    return recurrence ? presetFor(recurrence) === null : false;
+  });
+
+  const activePreset = presetFor({
+    type: formRecurrenceType ?? "monthly",
+    interval: formRecurrenceInterval ?? 1,
+    bymonthday: formRecurrenceBymonthday,
+  });
+  const frequencyValue = useCustomFrequency
+    ? "custom"
+    : (activePreset?.id ?? "custom");
+
+  const handleFrequencyChange = (value: string) => {
+    if (value === "custom") {
+      setUseCustomFrequency(true);
+      return;
+    }
+    const preset = FREQUENCY_PRESETS.find((p) => p.id === value);
+    if (!preset) return;
+    setUseCustomFrequency(false);
+    form.setValue("recurrence.type", preset.type);
+    form.setValue("recurrence.interval", preset.interval);
+  };
 
   const handleInternalSubmit = (data: BillFormValues) => {
     if (data.type === "recurring") {
@@ -177,9 +217,17 @@ export function BillFormFields({
 
         <Tabs
           value={formType}
-          onValueChange={(value) =>
-            form.setValue("type", value as BillFormValues["type"])
-          }
+          onValueChange={(value) => {
+            form.setValue("type", value as BillFormValues["type"]);
+            // Seed a default cadence the first time the repeating tab is opened
+            // so a preset is selected without the user touching the picker.
+            if (
+              value === "recurring" &&
+              form.getValues("recurrence.interval") == null
+            ) {
+              handleFrequencyChange("monthly");
+            }
+          }}
         >
           <TabsList className="w-full">
             <TabsTrigger value="single">Once</TabsTrigger>
@@ -201,55 +249,78 @@ export function BillFormFields({
             />
           </TabsContent>
           <TabsContent value="recurring" className="space-y-4">
-            <FormField
-              control={form.control}
-              name="recurrence.type"
-              defaultValue="monthly"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Every</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="weekly">Week</SelectItem>
-                      <SelectItem value="monthly">Month</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="recurrence.interval"
-              defaultValue={1}
-              rules={{ min: 1 }}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Repeats every {Number(field.value) || 1}{" "}
-                    {formRecurrenceType === "weekly"
-                      ? "week" + (Number(field.value) !== 1 ? "s" : "")
-                      : "month" + (Number(field.value) !== 1 ? "s" : "")}
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="Interval"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="space-y-2">
+              <Label>Frequency</Label>
+              <Select
+                value={frequencyValue}
+                onValueChange={handleFrequencyChange}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FREQUENCY_PRESETS.map((preset) => (
+                    <SelectItem key={preset.id} value={preset.id}>
+                      {preset.label}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="custom">Custom…</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {useCustomFrequency && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="recurrence.type"
+                  defaultValue="monthly"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Repeat unit</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="weekly">Week</SelectItem>
+                          <SelectItem value="monthly">Month</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="recurrence.interval"
+                  defaultValue={1}
+                  rules={{ min: 1 }}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Repeats every {Number(field.value) || 1}{" "}
+                        {formRecurrenceType === "weekly"
+                          ? "week" + (Number(field.value) !== 1 ? "s" : "")
+                          : "month" + (Number(field.value) !== 1 ? "s" : "")}
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Interval"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
             <FormField
               control={form.control}
               name="recurrence.dtstart"

@@ -5,6 +5,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { formatUtcDate } from "~/lib/date-utils";
+import { formatRecurrence } from "~/lib/recurrence";
 import type { PlaygroundBill, PlaygroundBillData } from "~/types";
 import {
   BillFormFields,
@@ -77,9 +78,7 @@ function PlaygroundBillViewMode({
           <div>
             <p className="text-muted-foreground text-sm">Schedule</p>
             <p className="font-medium">
-              Every {bill.recurrence.interval}{" "}
-              {bill.recurrence.type === "weekly" ? "week" : "month"}
-              {bill.recurrence.interval !== 1 ? "s" : ""}
+              {formatRecurrence(bill.recurrence)}
             </p>
             {bill.recurrence.dtstart && (
               <p className="text-muted-foreground text-sm">
