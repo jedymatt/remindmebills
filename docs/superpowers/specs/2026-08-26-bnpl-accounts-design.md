@@ -221,24 +221,75 @@ Account ownership is validated on every write, following the existing
 
 ## Edge cases
 
-1. **Changing an account's `dueDay` recomputes every one of its purchases'
-   `dtstart`**, in the same mutation. Without this, existing purchases keep the
-   old day and the account silently splits into two statements — defeating the
-   derivation.
-2. **Deleting an account cascades** to its purchases *and* their `payments`
-   documents, following the cascade already in `bill.delete`. Unsetting
-   `bnplAccountId` instead would turn installments into ordinary bills that
-   suddenly materialize in the pay-period list. A confirmation dialog names the
-   purchase count first.
-3. **`dtstart` derivation clamps to month end** (see Model).
-4. A fully-elapsed purchase stops generating occurrences via `count`; it sorts
-   last on the account card with a "Done" badge.
-5. An account with no purchases shows ₱0 committed and produces no roll-up row.
-6. Deleting a single purchase cascades its `payments` documents. This happens
-   in `bnplRouter`, which must implement the cascade itself — it does not route
-   through `bill.delete`.
-7. All `bill.getAll` consumers must be swept for the partition during
-   implementation, not just the three named above.
+### 1. Changing an account's due day rewrites its purchases
+
+Say a SPayLater account has `dueDay: 15` and three purchases, each stored with
+`dtstart` on the 15th. The due day then changes to 20 — the provider moved the
+cycle, or the original value was a typo.
+
+Updating only the account document leaves the three existing purchases
+generating occurrences on the 15th while new ones generate on the 20th. The
+dashboard would then show **two** SPayLater rows in the same month. That is the
+split statement the derivation exists to prevent, so the mutation that changes
+`dueDay` must also rewrite `dtstart` on every purchase belonging to that
+account.
+
+### 2. Deleting an account cascades
+
+Deletion removes the account, its purchases, *and* their `payments` documents,
+following the cascade already in `bill.delete`. A confirmation dialog names the
+purchase count first.
+
+Unsetting `bnplAccountId` instead would turn every installment into an ordinary
+bill, which would then materialize as individual rows in the pay-period list —
+the exact clutter this feature removes.
+
+### 3. Due days 29–31 clamp to month end
+
+`dueDay` may be 31, but not every month has a 31st. With `dueDay: 31` and
+February as the first month, there is no Feb 31 to store. Rolling forward to
+Mar 3 would place the statement in the wrong month and skip February entirely,
+so derivation clamps backward instead: Feb 28, or Feb 29 in a leap year.
+
+`monthlyOccurrencesInPeriod` already clamps the occurrences it generates. What
+needs attention is that the **first** date — `dtstart` itself — is computed with
+the same clamping, rather than assuming the generator will cover it.
+
+### 4. Deleting a single purchase cascades its payments
+
+Deleting an ordinary bill also deletes that bill's `payments` rows, or paid
+markers would outlive the bill they point at. A purchase is a bill, so it needs
+the same cleanup — but purchase mutations live in `bnplRouter` (keeping
+`billRouter` unable to mint or manage BNPL items), so `bnplRouter` does not
+inherit it.
+
+Rather than duplicating the cascade in both routers, extract it into a **shared
+helper** that both call, so the rule lives in one place.
+
+### 5. Every `bill.getAll` consumer is accounted for
+
+`bill.getAll` returns every bill, purchases included. Any consumer that assumes
+"these are all ordinary bills" leaks purchases back into a list as individual
+rows. The sweep is done, and two consumers deliberately need no change:
+
+| Consumer                                   | Action                                                                                                  |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `billList.tsx:354`                         | **Partition** — group rows vs roll-up row                                                               |
+| `financialSummaryCards.tsx`                | **Partition** — a statement counts as 1                                                                 |
+| `playgroundStartScreen.tsx:31`             | **Partition** — "clone my bills" would otherwise drag purchases into the playground as loose bills       |
+| `dashboardPage.tsx:133`                    | **No change, deliberately** — `hasBills` must count purchases, or a BNPL-only user sees "No bills yet"   |
+| `groupManager.tsx:232`                     | **No change** — already filters on `groupId`, which purchases never carry                                |
+| `billModal`, `billViewMode`, `createBillForm` | **No change** — invalidation only; roll-up rows are not clickable                                     |
+
+`playgroundStartScreen` is the subtle one: a purchase clones perfectly into the
+playground *because* it is a structurally valid recurring bill, reappearing as
+individual rows in the one surface declared out of scope.
+
+### 6. Lesser cases
+
+- A fully-elapsed purchase stops generating occurrences via `count`; it sorts
+  last on the account card with a "Done" badge.
+- An account with no purchases shows ₱0 committed and produces no roll-up row.
 
 ## Verification
 
