@@ -30,7 +30,7 @@ record rather than forgotten:
 - Payoff-progress reporting beyond a per-purchase "3 of 6" count.
 - Credit limits and utilization.
 - Provider presets (a curated list of BNPL brands with icons/colours).
-- Drag-reordering accounts.
+- Reordering accounts, and per-account colour coding.
 - Playground support — `PlaygroundBill` is local-only demo state and gains
   nothing from a second entity shape.
 
@@ -46,10 +46,15 @@ Many per user, one document per provider account.
 | `userId` | `ObjectId` |                                          |
 | `name`   | `string`   | Free text, e.g. "SPayLater". 1–50 chars. |
 | `dueDay` | `number`   | Day of month, 1–31.                      |
-| `order`  | `number`   | Stable sort order; `max + 1` on create.  |
 
-`order` exists so the list doesn't reshuffle between renders. There is no
-reorder UI in this pass.
+Accounts are listed in creation order via `.sort({ _id: 1 })`. There is
+deliberately **no `order` field**: ObjectIds are timestamp-prefixed, so `_id`
+already gives a stable insertion-order sort with nothing to write or keep
+consistent. `groups` carries `order` because it earns two jobs there — the
+drag-reorder mutation and `colorForOrder` swatch derivation — and neither
+applies here. Should reordering ever land, adding `order` then is
+migration-free: absent means "fall back to `_id` order", the same trick
+`bnplAccountId` relies on.
 
 ### Purchases: `bills` documents with `bnplAccountId`
 
