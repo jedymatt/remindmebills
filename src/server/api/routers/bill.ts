@@ -4,6 +4,7 @@ import type { Simplify } from "type-fest";
 import { z } from "zod";
 import { RecurringBillSchema, SingleBillSchema } from "~/schemas/bill";
 import type { BillEvent as SerializedBillEvent } from "~/types";
+import { deleteBillsWithPayments } from "../bill-cascade";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const InputBillSchema = z
@@ -128,21 +129,15 @@ export const billRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Bill not found" });
       }
 
-      const billOid = new ObjectId(input.id);
-      const userOid = new ObjectId(ctx.session.user.id);
-      const result = await ctx.db
-        .collection("bills")
-        .deleteOne({ _id: billOid, userId: userOid });
+      const deleted = await deleteBillsWithPayments(
+        ctx.db,
+        new ObjectId(ctx.session.user.id),
+        [new ObjectId(input.id)],
+      );
 
-      if (result.deletedCount === 0) {
+      if (deleted === 0) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Bill not found" });
       }
-
-      // Cascade: drop any paid-occurrence markers for this bill so they don't
-      // orphan in the payments collection.
-      await ctx.db
-        .collection("payments")
-        .deleteMany({ userId: userOid, billId: billOid });
     }),
   create: protectedProcedure
     .input(InputBillSchema)

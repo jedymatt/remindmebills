@@ -3,8 +3,11 @@ import { ObjectId, type Db, type WithoutId } from "mongodb";
 import { deriveStatementDtstart } from "~/lib/bnpl-utils";
 import {
   CreateBnplAccountInputSchema,
+  CreateBnplPurchaseInputSchema,
   DeleteBnplAccountInputSchema,
+  DeleteBnplPurchaseInputSchema,
   UpdateBnplAccountInputSchema,
+  UpdateBnplPurchaseInputSchema,
 } from "~/schemas/bnpl";
 import { deleteBillsWithPayments } from "../bill-cascade";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -241,5 +244,103 @@ export const bnplRouter = createTRPCRouter({
       await ctx.db
         .collection<BnplAccountDoc>("bnpl_accounts")
         .deleteOne({ _id: accountOid, userId: userOid });
+    }),
+
+  createPurchase: protectedProcedure
+    .input(CreateBnplPurchaseInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const { accountOid, userOid, dueDay } = await assertAccountOwned(
+        ctx,
+        input.accountId,
+      );
+
+      await ctx.db.collection("bills").insertOne({
+        userId: userOid,
+        bnplAccountId: accountOid,
+        title: input.title,
+        amount: input.amount,
+        type: "recurring",
+        recurrence: {
+          type: "monthly",
+          interval: 1,
+          // Derived, never client-supplied: the account owns the day.
+          dtstart: deriveStatementDtstart(dueDay, input.firstDueMonth),
+          count: input.tenureMonths,
+        },
+      });
+    }),
+
+  updatePurchase: protectedProcedure
+    .input(UpdateBnplPurchaseInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      if (!ObjectId.isValid(input.id)) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Purchase not found",
+        });
+      }
+
+      const userOid = new ObjectId(ctx.session.user.id);
+      const purchase = await ctx.db
+        .collection<{ _id: ObjectId; bnplAccountId?: ObjectId }>("bills")
+        .findOne(
+          { _id: new ObjectId(input.id), userId: userOid },
+          { projection: { bnplAccountId: 1 } },
+        );
+
+      // Guard on bnplAccountId, not just existence: this endpoint must not be
+      // usable to reshape an ordinary bill into an installment.
+      if (!purchase?.bnplAccountId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Purchase not found",
+        });
+      }
+
+      const { dueDay } = await assertAccountOwned(
+        ctx,
+        purchase.bnplAccountId.toHexString(),
+      );
+
+      await ctx.db.collection("bills").updateOne(
+        { _id: purchase._id, userId: userOid },
+        {
+          $set: {
+            title: input.data.title,
+            amount: input.data.amount,
+            type: "recurring",
+            recurrence: {
+              type: "monthly",
+              interval: 1,
+              dtstart: deriveStatementDtstart(dueDay, input.data.firstDueMonth),
+              count: input.data.tenureMonths,
+            },
+          },
+        },
+      );
+    }),
+
+  deletePurchase: protectedProcedure
+    .input(DeleteBnplPurchaseInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      if (!ObjectId.isValid(input.id)) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Purchase not found",
+        });
+      }
+
+      const deleted = await deleteBillsWithPayments(
+        ctx.db,
+        new ObjectId(ctx.session.user.id),
+        [new ObjectId(input.id)],
+      );
+
+      if (deleted === 0) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Purchase not found",
+        });
+      }
     }),
 });
