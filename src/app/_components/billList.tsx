@@ -211,8 +211,11 @@ function BillListCard({
     [installments, accounts],
   );
 
-  // Installments are counted here but itemized as one roll-up row per account
-  // below, so section subtotals plus statement amounts still equal `outgoing`.
+  // Paid bills and installments both stay in this sum rather than dropping out:
+  // paid shows as a struck row instead (balance is income−all-bills, not "cash
+  // left" — "remaining to pay" lives in the summary cards), and installments are
+  // itemized as one roll-up row per account below, so section subtotals plus
+  // statement amounts still equal `outgoing`.
   const outgoing = useMemo(
     () =>
       sumBy(
