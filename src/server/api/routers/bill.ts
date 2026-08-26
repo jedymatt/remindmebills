@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { ObjectId, type Db, type WithoutId } from "mongodb";
+import { omit } from "radashi";
 import type { Simplify } from "type-fest";
 import { z } from "zod";
 import { RecurringBillSchema, SingleBillSchema } from "~/schemas/bill";
@@ -124,8 +125,9 @@ export const billRouter = createTRPCRouter({
       }
 
       const groupOid = await resolveGroupId(ctx, input.data.groupId);
-      const { groupId: _groupId, ...rest } = input.data;
-      const update: Record<string, unknown> = { ...rest };
+      const update: Record<string, unknown> = {
+        ...omit(input.data, ["groupId"]),
+      };
       if (groupOid !== null) update.groupId = groupOid;
 
       const setOps: Record<string, unknown> = { $set: update };
@@ -189,10 +191,9 @@ export const billRouter = createTRPCRouter({
     .input(InputBillSchema)
     .mutation(async ({ ctx, input }) => {
       const groupOid = await resolveGroupId(ctx, input.groupId);
-      const { groupId: _groupId, ...rest } = input;
 
       await ctx.db.collection<WithoutId<BillEvent>>("bills").insertOne({
-        ...rest,
+        ...omit(input, ["groupId"]),
         userId: new ObjectId(ctx.session.user.id),
         ...(groupOid !== null ? { groupId: groupOid } : {}),
       });
