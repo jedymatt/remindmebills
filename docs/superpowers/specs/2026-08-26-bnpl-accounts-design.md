@@ -234,15 +234,22 @@ split statement the derivation exists to prevent, so the mutation that changes
 `dueDay` must also rewrite `dtstart` on every purchase belonging to that
 account.
 
-### 2. Deleting an account cascades
+### 2. Deleting an account asks what to do with its purchases
 
-Deletion removes the account, its purchases, *and* their `payments` documents,
-following the cascade already in `bill.delete`. A confirmation dialog names the
-purchase count first.
+The confirmation dialog names the purchase count and offers two outcomes:
 
-Unsetting `bnplAccountId` instead would turn every installment into an ordinary
-bill, which would then materialize as individual rows in the pay-period list —
-the exact clutter this feature removes.
+- **Delete purchases too** — the account, its purchases, and their paid-markers
+  are all removed, via the shared cascade helper (see case 4).
+- **Keep as ordinary bills** — `bnplAccountId` is unset. The purchases survive
+  as plain monthly recurring bills and begin appearing as individual rows in the
+  pay-period list. Their `count` still ends them at the close of their tenure,
+  and their paid-markers stay valid because the bill ids never change — so this
+  path deliberately does **not** touch `payments`.
+
+Neither outcome dominates, which is why both are offered instead of one being
+chosen here. Cascading destroys real purchase and payment history. Unsetting
+destroys nothing and merely costs tidiness — the bill list gets those rows back.
+That trade belongs to the person doing the deleting, at the moment they do it.
 
 ### 3. Due days 29–31 clamp to month end
 
@@ -255,22 +262,39 @@ so derivation clamps backward instead: Feb 28, or Feb 29 in a leap year.
 needs attention is that the **first** date — `dtstart` itself — is computed with
 the same clamping, rather than assuming the generator will cover it.
 
-### 4. Deleting a single purchase cascades its payments
+### 4. Deleting a single purchase also deletes its paid-markers
 
-Deleting an ordinary bill also deletes that bill's `payments` rows, or paid
-markers would outlive the bill they point at. A purchase is a bill, so it needs
-the same cleanup — but purchase mutations live in `bnplRouter` (keeping
-`billRouter` unable to mint or manage BNPL items), so `bnplRouter` does not
-inherit it.
+Background: marking something paid does not modify the bill. It writes a tiny
+separate document into the `payments` collection that says, in effect, *"bill X,
+the occurrence on date Y, is settled."* It holds no amount — just that pairing.
+Paid state is the presence of such a marker; unpaid is its absence.
 
-Rather than duplicating the cascade in both routers, extract it into a **shared
-helper** that both call, so the rule lives in one place.
+That means deleting a bill without deleting its markers leaves rows pointing at
+a bill that no longer exists. Nothing can render them, and nothing can clear
+them; they simply accumulate. `bill.delete` already avoids this by removing both
+together.
 
-### 5. Every `bill.getAll` consumer is accounted for
+A purchase is a bill, so it needs the same cleanup. But purchase deletion lives
+in `bnplRouter` — deliberately, so `billRouter` can never create or manage a
+BNPL item — which means `bnplRouter` does not get `bill.delete`'s cleanup for
+free.
 
-`bill.getAll` returns every bill, purchases included. Any consumer that assumes
-"these are all ordinary bills" leaks purchases back into a list as individual
-rows. The sweep is done, and two consumers deliberately need no change:
+Writing the same two-step delete in both routers would mean one rule living in
+two places, correct only as long as both are remembered. Instead it is extracted
+into a **shared helper** that both routers call.
+
+### 5. Every screen that reads the bill list is accounted for
+
+Purchases are stored in the same `bills` collection as ordinary bills, so the
+single query the whole app uses to fetch bills — `bill.getAll` — returns both
+kinds mixed together. Any screen that takes that result and assumes every row is
+an ordinary bill will render purchases as individual rows, which is exactly the
+clutter this feature exists to remove.
+
+`partitionBills` is the fix, but it only helps where it is actually called. So
+every consumer of `bill.getAll` was checked, and the result is below rather than
+left as "remember to look during implementation". Two of them correctly need no
+change, for opposite reasons:
 
 | Consumer                                   | Action                                                                                                  |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------- |

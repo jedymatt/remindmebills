@@ -709,16 +709,18 @@ git commit -m "feat: add BNPL statement grouping and installment progress (#44)"
 
 **Files:**
 - Create: `src/schemas/bnpl.ts`
+- Create: `src/server/api/bill-cascade.ts`
 - Create: `src/server/api/routers/bnpl.ts`
 - Modify: `src/server/api/root.ts`
 
 **Interfaces:**
 - Consumes: `deriveStatementDtstart` (Task 1), `BnplAccount` (Task 3).
 - Produces:
+  - `deleteBillsWithPayments(db, userOid, billOids): Promise<number>` — used again in Task 5.
   - `bnpl.getAll` → `BnplAccount[]`, sorted by `_id`.
   - `bnpl.create({ name, dueDay })` → `BnplAccount`.
   - `bnpl.update({ id, data: { name?, dueDay? } })` → `void`.
-  - `bnpl.delete({ id })` → `void`.
+  - `bnpl.delete({ id, purchases: "delete" | "keep" })` → `void`.
   - Exported from `bnpl.ts` for Task 5: `type BnplAccountDoc`, `assertAccountOwned(ctx, accountId)`.
   - Zod schemas in `src/schemas/bnpl.ts`, extended in Task 5.
 
@@ -753,7 +755,13 @@ export const UpdateBnplAccountInputSchema = z.object({
   }),
 });
 
-export const DeleteBnplAccountInputSchema = z.object({ id: z.string() });
+// `purchases` has no default on purpose: deleting an account is destructive in
+// one direction and merely untidy in the other, so the caller must state which
+// it wants rather than inheriting a choice made here.
+export const DeleteBnplAccountInputSchema = z.object({
+  id: z.string(),
+  purchases: z.enum(["delete", "keep"]),
+});
 
 export type CreateBnplAccountInput = z.infer<
   typeof CreateBnplAccountInputSchema
@@ -763,7 +771,50 @@ export type UpdateBnplAccountInput = z.infer<
 >;
 ```
 
-- [ ] **Step 2: Write the router**
+- [ ] **Step 2: Create the shared cascade helper**
+
+Create `src/server/api/bill-cascade.ts`. Both the account delete below and the
+bill router (Task 5) need it, so it lands here rather than being written twice.
+
+```ts
+import type { Db, ObjectId } from "mongodb";
+
+/**
+ * Delete bills together with the paid-occurrence markers pointing at them.
+ *
+ * A `payments` document is a small marker meaning "this bill's occurrence on
+ * this date is settled" — it carries no amount, only that pairing. Occurrences
+ * are generated from a bill's recurrence rather than stored, so a marker is
+ * only meaningful while its bill exists. Deleting a bill without its markers
+ * leaves rows nothing can render and nothing can clear.
+ *
+ * Shared by the bill router and the BNPL router: purchases are `bills` rows,
+ * but their mutations live in the BNPL router, so without this helper the same
+ * rule would be written twice and remembered once.
+ *
+ * Returns the number of bills actually deleted, so callers can distinguish
+ * "not found" from "deleted".
+ */
+export async function deleteBillsWithPayments(
+  db: Db,
+  userOid: ObjectId,
+  billOids: ObjectId[],
+): Promise<number> {
+  if (billOids.length === 0) return 0;
+
+  const result = await db
+    .collection("bills")
+    .deleteMany({ _id: { $in: billOids }, userId: userOid });
+
+  await db
+    .collection("payments")
+    .deleteMany({ userId: userOid, billId: { $in: billOids } });
+
+  return result.deletedCount;
+}
+```
+
+- [ ] **Step 3: Write the router**
 
 Create `src/server/api/routers/bnpl.ts`:
 
@@ -776,6 +827,7 @@ import {
   DeleteBnplAccountInputSchema,
   UpdateBnplAccountInputSchema,
 } from "~/schemas/bnpl";
+import { deleteBillsWithPayments } from "../bill-cascade";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 // DB representation — ObjectId fields. See ~/types `BnplAccount` for the
@@ -924,28 +976,38 @@ export const bnplRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { accountOid, userOid } = await assertAccountOwned(ctx, input.id);
 
-      // Cascade rather than unset: leaving the purchases behind as ordinary
-      // bills would make every installment materialize as its own row in the
-      // pay-period list.
-      const cursor = ctx.db
-        .collection<{ _id: ObjectId }>("bills")
-        .find(
-          { userId: userOid, bnplAccountId: accountOid },
-          { projection: { _id: 1 } },
-        );
-      const purchases = await cursor.toArray();
-      await cursor.close();
+      if (input.purchases === "delete") {
+        const cursor = ctx.db
+          .collection<{ _id: ObjectId }>("bills")
+          .find(
+            { userId: userOid, bnplAccountId: accountOid },
+            { projection: { _id: 1 } },
+          );
+        const purchases = await cursor.toArray();
+        await cursor.close();
 
-      const billOids = purchases.map((p) => p._id);
-      if (billOids.length > 0) {
+        await deleteBillsWithPayments(
+          ctx.db,
+          userOid,
+          purchases.map((p) => p._id),
+        );
+      } else {
+        // Keep: drop only the account reference, so each purchase becomes an
+        // ordinary monthly recurring bill. Its `count` still ends it at the
+        // close of its tenure.
+        //
+        // `payments` is deliberately untouched — the bill ids don't change, so
+        // every existing paid-marker stays valid and correctly attached.
         await ctx.db
           .collection("bills")
-          .deleteMany({ _id: { $in: billOids }, userId: userOid });
-        await ctx.db
-          .collection("payments")
-          .deleteMany({ userId: userOid, billId: { $in: billOids } });
+          .updateMany(
+            { userId: userOid, bnplAccountId: accountOid },
+            { $unset: { bnplAccountId: "" } },
+          );
       }
 
+      // Purchases are handled first so a failure here can be retried without
+      // having already orphaned them — the same ordering as `group.delete`.
       await ctx.db
         .collection<BnplAccountDoc>("bnpl_accounts")
         .deleteOne({ _id: accountOid, userId: userOid });
@@ -953,7 +1015,7 @@ export const bnplRouter = createTRPCRouter({
 });
 ```
 
-- [ ] **Step 3: Register the router**
+- [ ] **Step 4: Register the router**
 
 In `src/server/api/root.ts`, add the import and the entry:
 
@@ -972,82 +1034,39 @@ export const appRouter = createTRPCRouter({
 });
 ```
 
-- [ ] **Step 4: Typecheck and lint**
+- [ ] **Step 5: Typecheck and lint**
 
 ```bash
 pnpm exec tsc --noEmit
-pnpm exec eslint src/schemas/bnpl.ts src/server/api/routers/bnpl.ts src/server/api/root.ts
+pnpm exec eslint src/schemas/bnpl.ts src/server/api/bill-cascade.ts src/server/api/routers/bnpl.ts src/server/api/root.ts
 ```
 
 Expected: both clean. The `input.data.dueDay!` non-null assertion inside the `flatMap` is guarded by the `undefined` early-return above it; if the lint config forbids `!`, hoist it instead: `const nextDueDay = input.data.dueDay;` before the early return, then use `nextDueDay`.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/schemas/bnpl.ts src/server/api/routers/bnpl.ts src/server/api/root.ts
+git add src/schemas/bnpl.ts src/server/api/bill-cascade.ts src/server/api/routers/bnpl.ts src/server/api/root.ts
 git commit -m "feat: add BNPL account router with due-day schedule rewrite (#44)"
 ```
 
 ---
 
-## Task 5: Shared cascade helper and purchase mutations
+## Task 5: Purchase mutations
 
 **Files:**
-- Create: `src/server/api/bill-cascade.ts`
 - Modify: `src/server/api/routers/bill.ts:120-146`
 - Modify: `src/server/api/routers/bnpl.ts`
 - Modify: `src/schemas/bnpl.ts`
 
 **Interfaces:**
-- Consumes: `assertAccountOwned`, `BnplAccountDoc` (Task 4), `deriveStatementDtstart` (Task 1).
+- Consumes: `assertAccountOwned`, `BnplAccountDoc`, `deleteBillsWithPayments` (Task 4), `deriveStatementDtstart` (Task 1).
 - Produces:
-  - `deleteBillsWithPayments(db, userOid, billOids): Promise<number>`.
   - `bnpl.createPurchase({ accountId, title, amount, tenureMonths, firstDueMonth })` → `void`.
   - `bnpl.updatePurchase({ id, data: { title, amount, tenureMonths, firstDueMonth } })` → `void`.
   - `bnpl.deletePurchase({ id })` → `void`.
 
-- [ ] **Step 1: Extract the cascade helper**
-
-Create `src/server/api/bill-cascade.ts`:
-
-```ts
-import type { Db, ObjectId } from "mongodb";
-
-/**
- * Delete bills together with the paid-occurrence markers pointing at them.
- *
- * Occurrences aren't stored rows — they're generated from a bill's recurrence —
- * so a `payments` document is only meaningful while its bill exists. Deleting a
- * bill without its payments leaves markers that can never be rendered or
- * cleared.
- *
- * Shared by the bill router and the BNPL router: purchases are `bills` rows, but
- * their mutations live in the BNPL router, so without this helper the same rule
- * would be written twice and remembered once.
- *
- * Returns the number of bills actually deleted, so callers can distinguish "not
- * found" from "deleted".
- */
-export async function deleteBillsWithPayments(
-  db: Db,
-  userOid: ObjectId,
-  billOids: ObjectId[],
-): Promise<number> {
-  if (billOids.length === 0) return 0;
-
-  const result = await db
-    .collection("bills")
-    .deleteMany({ _id: { $in: billOids }, userId: userOid });
-
-  await db
-    .collection("payments")
-    .deleteMany({ userId: userOid, billId: { $in: billOids } });
-
-  return result.deletedCount;
-}
-```
-
-- [ ] **Step 2: Use it in the bill router**
+- [ ] **Step 1: Use the shared cascade in the bill router**
 
 In `src/server/api/routers/bill.ts`, add the import:
 
@@ -1077,20 +1096,7 @@ Replace the body of the `delete` procedure (currently the `deleteOne` plus the t
     }),
 ```
 
-- [ ] **Step 3: Use it in the account delete**
-
-In `src/server/api/routers/bnpl.ts`, add the import and replace the two `deleteMany` calls written in Task 4 with the helper:
-
-```ts
-import { deleteBillsWithPayments } from "../bill-cascade";
-```
-
-```ts
-      const billOids = purchases.map((p) => p._id);
-      await deleteBillsWithPayments(ctx.db, userOid, billOids);
-```
-
-- [ ] **Step 4: Add the purchase schemas**
+- [ ] **Step 2: Add the purchase schemas**
 
 Append to `src/schemas/bnpl.ts`:
 
@@ -1126,7 +1132,7 @@ export type UpdateBnplPurchaseInput = z.infer<
 >;
 ```
 
-- [ ] **Step 5: Add the purchase mutations**
+- [ ] **Step 3: Add the purchase mutations**
 
 In `src/server/api/routers/bnpl.ts`, extend the imports:
 
@@ -1231,23 +1237,23 @@ Add these procedures inside `bnplRouter`:
     }),
 ```
 
-- [ ] **Step 6: Typecheck and lint**
+- [ ] **Step 4: Typecheck and lint**
 
 ```bash
 pnpm exec tsc --noEmit
-pnpm exec eslint src/server/api/bill-cascade.ts src/server/api/routers/bill.ts src/server/api/routers/bnpl.ts src/schemas/bnpl.ts
+pnpm exec eslint src/server/api/routers/bill.ts src/server/api/routers/bnpl.ts src/schemas/bnpl.ts
 ```
 
-- [ ] **Step 7: Run the existing tests**
+- [ ] **Step 5: Run the existing tests**
 
 Run: `pnpm test`
 Expected: PASS — nothing in Tasks 1–3 should be affected.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/server/api/bill-cascade.ts src/server/api/routers/bill.ts src/server/api/routers/bnpl.ts src/schemas/bnpl.ts
-git commit -m "feat: add BNPL purchase mutations and shared bill cascade (#44)"
+git add src/server/api/routers/bill.ts src/server/api/routers/bnpl.ts src/schemas/bnpl.ts
+git commit -m "feat: add BNPL purchase mutations (#44)"
 ```
 
 ---
@@ -1602,6 +1608,14 @@ export function BnplManager() {
   const [editing, setEditing] = useState<BnplAccount | null>(null);
   const [deleting, setDeleting] = useState<BnplAccount | null>(null);
 
+  // The delete dialog names the count so the consequence of each option is
+  // concrete. Read from the shared bill list rather than a dedicated endpoint —
+  // the page already needs those rows in Task 8.
+  const { data: allBills } = api.bill.getAll.useQuery();
+  const deletingPurchaseCount = deleting
+    ? (allBills ?? []).filter((b) => b.bnplAccountId === deleting._id).length
+    : 0;
+
   const invalidate = () =>
     Promise.all([
       utils.bnpl.getAll.invalidate(),
@@ -1721,26 +1735,48 @@ export function BnplManager() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {deleting?.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This also deletes every purchase under this account and its
-              payment history. This cannot be undone.
+              {deletingPurchaseCount === 0
+                ? "This account has no purchases."
+                : `This account has ${deletingPurchaseCount} purchase${
+                    deletingPurchaseCount === 1 ? "" : "s"
+                  }. Choose what happens to them.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMut.isPending}>
-              Cancel
-            </AlertDialogCancel>
+          {/* Two outcomes rather than one default: deleting destroys purchase
+              and payment history, while keeping destroys nothing and only puts
+              those rows back in the bill list. Neither is obviously right, so
+              the choice is made here, in view of the count. */}
+          <AlertDialogFooter className="sm:flex-col sm:gap-2">
             <AlertDialogAction
+              className="w-full"
               onClick={(e) => {
                 e.preventDefault();
-                if (deleting) deleteMut.mutate({ id: deleting._id });
+                if (deleting)
+                  deleteMut.mutate({ id: deleting._id, purchases: "keep" });
+              }}
+              disabled={deleteMut.isPending || deletingPurchaseCount === 0}
+            >
+              Keep purchases as ordinary bills
+            </AlertDialogAction>
+            <AlertDialogAction
+              className="w-full"
+              onClick={(e) => {
+                e.preventDefault();
+                if (deleting)
+                  deleteMut.mutate({ id: deleting._id, purchases: "delete" });
               }}
               disabled={deleteMut.isPending}
             >
               {deleteMut.isPending && (
                 <Loader2 className="mr-1 size-4 animate-spin" />
               )}
-              Delete
+              {deletingPurchaseCount === 0
+                ? "Delete account"
+                : "Delete purchases too"}
             </AlertDialogAction>
+            <AlertDialogCancel className="w-full" disabled={deleteMut.isPending}>
+              Cancel
+            </AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1777,7 +1813,8 @@ Run `pnpm dev`, sign in, and confirm:
 2. With no accounts, the empty state shows and its button opens the dialog.
 3. Creating an account named `SPayLater` with due day `15` lists it as "Due day 15".
 4. Editing the name and due day persists after a reload.
-5. Deleting it asks for confirmation and removes it.
+5. Deleting an account with no purchases offers only "Delete account" and
+   removes it; "Keep purchases as ordinary bills" is disabled.
 
 - [ ] **Step 7: Commit**
 
@@ -2185,10 +2222,11 @@ import {
 } from "./bnplPurchaseFormDialog";
 ```
 
-Add the queries and derivations inside `BnplManager`, after the existing `accounts` query:
+Add the queries and derivations inside `BnplManager`, after the existing
+`accounts` query. Note `allBills` already exists from Task 7 — reuse it rather
+than declaring a second variable for the same query:
 
 ```tsx
-  const { data: bills } = api.bill.getAll.useQuery();
   const { data: payments } = api.payment.getAll.useQuery();
 
   const paidKeys = useMemo(() => buildPaidLookup(payments ?? []), [payments]);
@@ -2197,7 +2235,7 @@ Add the queries and derivations inside `BnplManager`, after the existing `accoun
   // rather than re-deriving dates here — one scheduler, one set of clamping
   // rules. A 14-month window is enough to always contain the next statement.
   const { purchasesByAccount, statementByAccount } = useMemo(() => {
-    const { installments } = partitionBills(bills ?? []);
+    const { installments } = partitionBills(allBills ?? []);
     // Already UTC midnight — localDateToUtcDateOnly maps today's local
     // calendar day onto the canonical frame the scheduler anchors on.
     const windowStart = localDateToUtcDateOnly(new Date());
@@ -2226,7 +2264,7 @@ Add the queries and derivations inside `BnplManager`, after the existing `accoun
     }
 
     return { purchasesByAccount, statementByAccount };
-  }, [bills, accounts]);
+  }, [allBills, accounts]);
 ```
 
 Add the purchase and statement mutations alongside the existing account mutations:
@@ -2435,7 +2473,13 @@ With `pnpm dev`, on `/bnpl`:
 4. Add a third purchase in the same month — the statement flips back to unpaid (expected).
 5. Edit the **account's** due day from 15 to 20 and reload: the statement date moves to the 20th and stays a *single* statement.
 6. Set the due day to 31 and add a purchase whose first month is February: the statement lands on Feb 28.
-7. Delete a purchase, then delete the account, confirming both dialogs.
+7. Delete a purchase, confirming its dialog.
+8. Delete the account choosing **Keep purchases as ordinary bills** — the
+   account disappears and its purchases now show as individual rows on
+   `/dashboard`, with any paid state preserved.
+9. Recreate an account with a purchase and delete it choosing **Delete purchases
+   too** — both the account and its purchases are gone from `/bnpl` and
+   `/dashboard`.
 
 - [ ] **Step 6: Commit**
 
@@ -2751,4 +2795,5 @@ git commit -m "feat: count BNPL statements in summary cards, exclude from playgr
 - An account's installments never appear as individual rows in the pay-period list; each account contributes one dated roll-up row whose amount is included in that period's "going out".
 - Section subtotals plus roll-up amounts equal each period card's outgoing total.
 - Changing an account's due day moves every existing purchase, leaving exactly one statement per month.
+- Deleting an account offers both outcomes: "delete purchases too" removes them and their paid-markers; "keep as ordinary bills" leaves them in the bill list with their paid history intact.
 - No file in `src/` contains the string "Shopee" or "SPayLater" outside of placeholder/example copy.
