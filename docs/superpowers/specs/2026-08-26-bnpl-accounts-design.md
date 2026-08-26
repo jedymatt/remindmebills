@@ -234,6 +234,11 @@ split statement the derivation exists to prevent, so the mutation that changes
 `dueDay` must also rewrite `dtstart` on every purchase belonging to that
 account.
 
+Because that rewrite silently moves the due date on purchases entered months
+ago, it is **confirmed first**. Saving a changed due day opens a dialog naming
+how many purchases will move and which day they move from and to; the rewrite
+runs only on confirmation. Changing an account's name alone never prompts.
+
 ### 2. Deleting an account asks what to do with its purchases
 
 The confirmation dialog names the purchase count and offers two outcomes:

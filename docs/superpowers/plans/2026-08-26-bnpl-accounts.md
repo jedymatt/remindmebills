@@ -1461,7 +1461,7 @@ const AccountFormSchema = z.object({
   dueDay: z.coerce.number().int().min(1).max(31),
 });
 
-type AccountFormValues = z.infer<typeof AccountFormSchema>;
+export type AccountFormValues = z.infer<typeof AccountFormSchema>;
 
 export function BnplAccountFormDialog({
   open,
@@ -1569,7 +1569,10 @@ import { toast } from "sonner";
 import { api } from "~/trpc/react";
 import type { BnplAccount } from "~/types";
 import { AuthenticatedLayout } from "./authenticatedLayout";
-import { BnplAccountFormDialog } from "./bnplAccountFormDialog";
+import {
+  BnplAccountFormDialog,
+  type AccountFormValues,
+} from "./bnplAccountFormDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1608,13 +1611,23 @@ export function BnplManager() {
   const [editing, setEditing] = useState<BnplAccount | null>(null);
   const [deleting, setDeleting] = useState<BnplAccount | null>(null);
 
-  // The delete dialog names the count so the consequence of each option is
+  // Both confirmation dialogs name a purchase count so their consequence is
   // concrete. Read from the shared bill list rather than a dedicated endpoint —
   // the page already needs those rows in Task 8.
   const { data: allBills } = api.bill.getAll.useQuery();
+  const purchaseCountFor = (accountId: string) =>
+    (allBills ?? []).filter((b) => b.bnplAccountId === accountId).length;
+
   const deletingPurchaseCount = deleting
-    ? (allBills ?? []).filter((b) => b.bnplAccountId === deleting._id).length
+    ? purchaseCountFor(deleting._id)
     : 0;
+
+  // A changed due day rewrites every existing purchase's schedule, which moves
+  // due dates the user may have set months ago. Held here until confirmed.
+  const [pendingDueDay, setPendingDueDay] = useState<{
+    account: BnplAccount;
+    values: AccountFormValues;
+  } | null>(null);
 
   const invalidate = () =>
     Promise.all([
@@ -1637,9 +1650,27 @@ export function BnplManager() {
       await invalidate();
       toast.success("Account updated");
       setEditing(null);
+      setPendingDueDay(null);
     },
     onError: (e) => toast.error(e.message || "Failed to update account"),
   });
+
+  // Saving an edit only prompts when the due day actually changed *and* there
+  // are purchases to move. A rename, or a due-day change on an empty account,
+  // saves straight through — a dialog with nothing at stake is just friction.
+  const handleEditSubmit = (values: AccountFormValues) => {
+    if (!editing) return;
+
+    const movesPurchases =
+      values.dueDay !== editing.dueDay && purchaseCountFor(editing._id) > 0;
+
+    if (movesPurchases) {
+      setPendingDueDay({ account: editing, values });
+      return;
+    }
+
+    updateMut.mutate({ id: editing._id, data: values });
+  };
 
   const deleteMut = api.bnpl.delete.useMutation({
     onSuccess: async () => {
@@ -1720,12 +1751,52 @@ export function BnplManager() {
         open={editing !== null}
         onOpenChange={(open) => !open && setEditing(null)}
         account={editing ?? undefined}
-        onSubmit={(values) => {
-          if (!editing) return;
-          updateMut.mutate({ id: editing._id, data: values });
-        }}
+        onSubmit={handleEditSubmit}
         isPending={updateMut.isPending}
       />
+
+      {/* Rendered above the still-open edit dialog, so cancelling returns to
+          the form with its values intact rather than discarding the edit. */}
+      <AlertDialog
+        open={pendingDueDay !== null}
+        onOpenChange={(open) => !open && setPendingDueDay(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Move the statement day?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDueDay &&
+                `${purchaseCountFor(pendingDueDay.account._id)} existing purchase${
+                  purchaseCountFor(pendingDueDay.account._id) === 1 ? "" : "s"
+                } will move from day ${pendingDueDay.account.dueDay} to day ${
+                  pendingDueDay.values.dueDay
+                }. Every statement date for this account changes to match, so it
+                stays a single monthly statement.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={updateMut.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (pendingDueDay)
+                  updateMut.mutate({
+                    id: pendingDueDay.account._id,
+                    data: pendingDueDay.values,
+                  });
+              }}
+              disabled={updateMut.isPending}
+            >
+              {updateMut.isPending && (
+                <Loader2 className="mr-1 size-4 animate-spin" />
+              )}
+              Move purchases
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={deleting !== null}
@@ -1812,7 +1883,8 @@ Run `pnpm dev`, sign in, and confirm:
 1. **BNPL** appears in the nav and `/bnpl` loads.
 2. With no accounts, the empty state shows and its button opens the dialog.
 3. Creating an account named `SPayLater` with due day `15` lists it as "Due day 15".
-4. Editing the name and due day persists after a reload.
+4. Editing the name and due day persists after a reload — and **no**
+   confirmation appears, because this account has no purchases to move.
 5. Deleting an account with no purchases offers only "Delete account" and
    removes it; "Keep purchases as ordinary bills" is disabled.
 
@@ -2471,7 +2543,10 @@ With `pnpm dev`, on `/bnpl`:
 2. Add a second purchase `Fan`, `700`, `3` months, same month. The statement becomes `₱1,950` — one line, not two.
 3. Mark the statement paid: the amount strikes through, both purchases count as paid.
 4. Add a third purchase in the same month — the statement flips back to unpaid (expected).
-5. Edit the **account's** due day from 15 to 20 and reload: the statement date moves to the 20th and stays a *single* statement.
+5. Edit the **account's** due day from 15 to 20. A confirmation names the
+   purchases that will move, from day 15 to day 20. Cancel it — nothing changes
+   and the edit form is still open with day 20 in it. Confirm it, then reload:
+   the statement date has moved to the 20th and is still a *single* statement.
 6. Set the due day to 31 and add a purchase whose first month is February: the statement lands on Feb 28.
 7. Delete a purchase, confirming its dialog.
 8. Delete the account choosing **Keep purchases as ordinary bills** — the
