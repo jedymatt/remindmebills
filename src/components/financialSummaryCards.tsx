@@ -61,13 +61,13 @@ export function FinancialSummaryCards({
   const paidKeys = useMemo(() => buildPaidLookup(payments ?? []), [payments]);
   const { data: accounts } = api.bnpl.getAll.useQuery();
 
-  const { remaining, nextItem, billCount } = useMemo(() => {
+  const { remaining, nextItem } = useMemo(() => {
     const payRule = createPayRule(incomeProfile);
     const currentPay = payRule.before(localDateToUtcDateOnly(new Date()), true);
-    if (!currentPay) return { remaining: 0, nextItem: null, billCount: 0 };
+    if (!currentPay) return { remaining: 0, nextItem: null };
 
     const nextPayDate = payRule.after(currentPay);
-    if (!nextPayDate) return { remaining: 0, nextItem: null, billCount: 0 };
+    if (!nextPayDate) return { remaining: 0, nextItem: null };
 
     const periodRows = computeBillsInPeriod(bills, currentPay, nextPayDate);
     const { bills: ordinaryRows, installments } = partitionBills(periodRows);
@@ -82,14 +82,6 @@ export function FinancialSummaryCards({
       s.billIds.every((id) => isOccurrencePaid(paidKeys, id, s.date))
         ? 0
         : s.amount,
-    );
-
-    // "Total Bills" counts a statement as one obligation, not N purchases —
-    // one payment is what the user actually makes.
-    const { bills: ordinaryAll, installments: installmentsAll } =
-      partitionBills(bills);
-    const accountsWithPurchases = new Set(
-      installmentsAll.map((b) => b.bnplAccountId),
     );
 
     // Nearest upcoming unpaid obligation of either kind.
@@ -118,9 +110,21 @@ export function FinancialSummaryCards({
     return {
       remaining: remainingBills + remainingStatements,
       nextItem: candidates[0] ?? null,
-      billCount: ordinaryAll.length + accountsWithPurchases.size,
     };
   }, [incomeProfile, bills, paidKeys, accounts]);
+
+  // Counted independently of the pay period. A statement is one obligation
+  // whenever it falls, and this card has always been whole-list ("Active
+  // bills"). Deriving it inside the period memo would make it read 0 whenever
+  // no current pay period resolves — e.g. a profile whose start date is still
+  // in the future.
+  const billCount = useMemo(() => {
+    const { bills: ordinaryAll, installments } = partitionBills(bills);
+    const accountsWithPurchases = new Set(
+      installments.map((b) => b.bnplAccountId),
+    );
+    return ordinaryAll.length + accountsWithPurchases.size;
+  }, [bills]);
 
   const income = incomeProfile.amount ?? 0;
 
