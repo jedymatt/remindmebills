@@ -29,14 +29,17 @@ jobs:
         task: [typecheck, lint, test]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Reads the pnpm version from `packageManager` in package.json, so it is
       # pinned in exactly one place. Must precede setup-node, whose pnpm cache
       # needs pnpm on PATH to locate the store.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      # `cache: pnpm` is stated explicitly even though setup-node v5+ would
+      # enable it automatically from the `packageManager` field — implicit
+      # caching is easy to miss when debugging a slow or stale run.
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: pnpm
