@@ -1,15 +1,25 @@
 "use client";
 
-import { CreditCard, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { addMonths } from "date-fns";
+import { CreditCard, Loader2, Plus } from "lucide-react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { computeBillsInPeriod, partitionBills } from "~/lib/bill-utils";
+import { groupStatements, type Statement } from "~/lib/bnpl-utils";
+import { localDateToUtcDateOnly } from "~/lib/date-utils";
+import { buildPaidLookup, occurrenceKey } from "~/lib/payment-utils";
 import { api } from "~/trpc/react";
-import type { BnplAccount } from "~/types";
+import type { BillEvent, BnplAccount } from "~/types";
 import { AuthenticatedLayout } from "./authenticatedLayout";
+import { BnplAccountCard } from "./bnplAccountCard";
 import {
   BnplAccountFormDialog,
   type AccountFormValues,
 } from "./bnplAccountFormDialog";
+import {
+  BnplPurchaseFormDialog,
+  type PurchaseFormValues,
+} from "./bnplPurchaseFormDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,6 +66,45 @@ export function BnplManager() {
     (allBills ?? []).filter((b) => b.bnplAccountId === accountId).length;
 
   const deletingPurchaseCount = deleting ? purchaseCountFor(deleting._id) : 0;
+
+  const { data: payments } = api.payment.getAll.useQuery();
+
+  const paidKeys = useMemo(() => buildPaidLookup(payments ?? []), [payments]);
+
+  // Statements are read off the same occurrence generator the dashboard uses,
+  // rather than re-deriving dates here — one scheduler, one set of clamping
+  // rules. A 14-month window is enough to always contain the next statement.
+  const { purchasesByAccount, statementByAccount } = useMemo(() => {
+    const { installments } = partitionBills(allBills ?? []);
+    // Already UTC midnight — localDateToUtcDateOnly maps today's local
+    // calendar day onto the canonical frame the scheduler anchors on.
+    const windowStart = localDateToUtcDateOnly(new Date());
+    const occurrences = computeBillsInPeriod(
+      installments,
+      windowStart,
+      addMonths(windowStart, 14),
+    );
+    const statements = groupStatements(occurrences, accounts ?? []);
+
+    const purchasesByAccount = new Map<string, BillEvent[]>();
+    for (const purchase of installments) {
+      if (!purchase.bnplAccountId) continue;
+      const list = purchasesByAccount.get(purchase.bnplAccountId) ?? [];
+      list.push(purchase);
+      purchasesByAccount.set(purchase.bnplAccountId, list);
+    }
+
+    // The first statement per account is the current one, since groupStatements
+    // sorts by date and the window starts today.
+    const statementByAccount = new Map<string, (typeof statements)[number]>();
+    for (const statement of statements) {
+      if (!statementByAccount.has(statement.accountId)) {
+        statementByAccount.set(statement.accountId, statement);
+      }
+    }
+
+    return { purchasesByAccount, statementByAccount };
+  }, [allBills, accounts]);
 
   // A changed due day rewrites every existing purchase's schedule, which moves
   // due dates the user may have set months ago. Held here until confirmed.
@@ -116,6 +165,83 @@ export function BnplManager() {
     onError: (e) => toast.error(e.message || "Failed to delete account"),
   });
 
+  const [purchaseTarget, setPurchaseTarget] = useState<{
+    account: BnplAccount;
+    purchase?: BillEvent;
+  } | null>(null);
+  const [deletingPurchase, setDeletingPurchase] = useState<BillEvent | null>(
+    null,
+  );
+  const [pendingStatements, setPendingStatements] = useState<Set<string>>(
+    new Set(),
+  );
+
+  const createPurchaseMut = api.bnpl.createPurchase.useMutation({
+    onSuccess: async () => {
+      await invalidate();
+      toast.success("Purchase added");
+      setPurchaseTarget(null);
+    },
+    onError: (e) => toast.error(e.message || "Failed to add purchase"),
+  });
+
+  const updatePurchaseMut = api.bnpl.updatePurchase.useMutation({
+    onSuccess: async () => {
+      await invalidate();
+      toast.success("Purchase updated");
+      setPurchaseTarget(null);
+    },
+    onError: (e) => toast.error(e.message || "Failed to update purchase"),
+  });
+
+  const deletePurchaseMut = api.bnpl.deletePurchase.useMutation({
+    onSuccess: async () => {
+      await invalidate();
+      toast.success("Purchase deleted");
+      setDeletingPurchase(null);
+    },
+    onError: (e) => toast.error(e.message || "Failed to delete purchase"),
+  });
+
+  const markStatementPaid = api.payment.markStatementPaid.useMutation();
+  const markStatementUnpaid = api.payment.markStatementUnpaid.useMutation();
+
+  // A statement is paid only when every purchase on it is paid, so a purchase
+  // added after settling correctly flips it back to unpaid.
+  const isStatementPaid = (statement: Statement) =>
+    statement.billIds.every((billId) =>
+      paidKeys.has(occurrenceKey(billId, statement.date)),
+    );
+
+  const handleToggleStatement = (statement: Statement) => {
+    const key = `${statement.accountId}:${statement.date.getTime()}`;
+    const currentlyPaid = isStatementPaid(statement);
+    setPendingStatements((prev) => new Set(prev).add(key));
+    const clearPending = () =>
+      setPendingStatements((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+
+    const mutation = currentlyPaid ? markStatementUnpaid : markStatementPaid;
+    mutation.mutate(
+      {
+        accountId: statement.accountId,
+        statementDate: statement.date,
+        billIds: statement.billIds,
+      },
+      {
+        onSuccess: () =>
+          void utils.payment.getAll.invalidate().finally(clearPending),
+        onError: (error) => {
+          toast.error(error.message || "Failed to update statement");
+          clearPending();
+        },
+      },
+    );
+  };
+
   return (
     <AuthenticatedLayout>
       <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
@@ -138,39 +264,35 @@ export function BnplManager() {
           <EmptyState onAdd={() => setCreateOpen(true)} />
         ) : (
           <div className="space-y-4">
-            {accounts.map((account) => (
-              <div
-                key={account._id}
-                className="border-border/40 bg-card flex items-center justify-between rounded-3xl border p-5"
-              >
-                <div>
-                  <p className="text-foreground font-semibold">
-                    {account.name}
-                  </p>
-                  <p className="text-muted-foreground text-xs">
-                    Due day {account.dueDay}
-                  </p>
-                </div>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Edit account"
-                    onClick={() => setEditing(account)}
-                  >
-                    <Pencil className="size-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Delete account"
-                    onClick={() => setDeleting(account)}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+            {accounts.map((account) => {
+              const statement = statementByAccount.get(account._id) ?? null;
+              const statementKey = statement
+                ? `${statement.accountId}:${statement.date.getTime()}`
+                : "";
+
+              return (
+                <BnplAccountCard
+                  key={account._id}
+                  account={account}
+                  purchases={purchasesByAccount.get(account._id) ?? []}
+                  statement={statement}
+                  isStatementPaid={
+                    statement ? isStatementPaid(statement) : false
+                  }
+                  isStatementPending={pendingStatements.has(statementKey)}
+                  onToggleStatementPaid={() =>
+                    statement && handleToggleStatement(statement)
+                  }
+                  onEditAccount={() => setEditing(account)}
+                  onDeleteAccount={() => setDeleting(account)}
+                  onAddPurchase={() => setPurchaseTarget({ account })}
+                  onEditPurchase={(purchase) =>
+                    setPurchaseTarget({ account, purchase })
+                  }
+                  onDeletePurchase={setDeletingPurchase}
+                />
+              );
+            })}
           </div>
         )}
       </div>
@@ -286,6 +408,72 @@ export function BnplManager() {
             >
               Cancel
             </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <BnplPurchaseFormDialog
+        open={purchaseTarget !== null}
+        onOpenChange={(open) => !open && setPurchaseTarget(null)}
+        accountName={purchaseTarget?.account.name ?? ""}
+        initialValues={
+          purchaseTarget?.purchase?.type === "recurring"
+            ? {
+                title: purchaseTarget.purchase.title,
+                amount: purchaseTarget.purchase.amount ?? 0,
+                tenureMonths: purchaseTarget.purchase.recurrence.count ?? 1,
+                firstDueMonth: purchaseTarget.purchase.recurrence.dtstart,
+              }
+            : undefined
+        }
+        onSubmit={(values: PurchaseFormValues) => {
+          if (!purchaseTarget) return;
+          if (purchaseTarget.purchase) {
+            updatePurchaseMut.mutate({
+              id: purchaseTarget.purchase._id,
+              data: values,
+            });
+          } else {
+            createPurchaseMut.mutate({
+              accountId: purchaseTarget.account._id,
+              ...values,
+            });
+          }
+        }}
+        isPending={createPurchaseMut.isPending || updatePurchaseMut.isPending}
+      />
+
+      <AlertDialog
+        open={deletingPurchase !== null}
+        onOpenChange={(open) => !open && setDeletingPurchase(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {deletingPurchase?.title}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the purchase and its payment history. This cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletePurchaseMut.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                if (deletingPurchase)
+                  deletePurchaseMut.mutate({ id: deletingPurchase._id });
+              }}
+              disabled={deletePurchaseMut.isPending}
+            >
+              {deletePurchaseMut.isPending && (
+                <Loader2 className="mr-1 size-4 animate-spin" />
+              )}
+              Delete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
