@@ -113,11 +113,21 @@ export function BnplAccountCard({
       <div className="px-5 pb-5">
         <ul className="divide-border/40 divide-y">
           {purchases.map((purchase) => {
-            if (purchase.type !== "recurring") return null;
+            // A purchase is always created recurring with a dtstart, but the
+            // BNPL router's own queries treat both as optional (legacy or
+            // partially-written rows), and `installmentProgress` would throw on
+            // an absent dtstart — taking the whole page down rather than one row.
+            if (purchase.type !== "recurring" || !purchase.recurrence.dtstart) {
+              return null;
+            }
+            // Anchored on today, not on the upcoming statement: the statement is
+            // the *next* one due, so measuring against it reports one
+            // installment more than has actually been billed and greys a
+            // purchase as "Done" a month before its final charge.
             const { elapsed, total } = installmentProgress(
               purchase.recurrence.dtstart,
               purchase.recurrence.count,
-              statement?.date ?? localDateToUtcDateOnly(new Date()),
+              localDateToUtcDateOnly(new Date()),
             );
             const isDone = elapsed >= total;
 

@@ -28,6 +28,27 @@ type BillEvent = Simplify<
   } & Omit<InputBill, "groupId">
 >;
 
+/**
+ * "This row is an ordinary bill, not a BNPL purchase" — the server-side spelling
+ * of the discriminator `partitionBills` applies on the client, and its exact
+ * complement `IS_PURCHASE`. Every mutation that must not reshape a purchase
+ * filters on this one constant rather than inlining its own predicate.
+ *
+ * Matches a missing field, an explicit `null`, and `""` — all three of which
+ * `BillEvent.bnplAccountId` (`?: string | null`) admits and `partitionBills`
+ * treats as ordinary. A bare `$exists: false` would call a null-valued row a
+ * purchase, leaving a bill that renders and opens normally but can never be
+ * saved.
+ */
+export const NOT_A_PURCHASE = {
+  bnplAccountId: { $not: { $type: "objectId" } },
+} as const;
+
+/** A BNPL purchase row: `bnplAccountId` holds a real account ObjectId. */
+export const IS_PURCHASE = {
+  bnplAccountId: { $type: "objectId" },
+} as const;
+
 type GroupDoc = {
   _id: ObjectId;
   userId: ObjectId;
@@ -124,7 +145,7 @@ export const billRouter = createTRPCRouter({
           // from the filter (rather than checking after the fact) makes a
           // purchase id read as the existing "Bill not found"; purchase edits
           // belong to `bnpl.updatePurchase`.
-          bnplAccountId: { $exists: false },
+          ...NOT_A_PURCHASE,
         },
         setOps,
       );
@@ -140,11 +161,25 @@ export const billRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Bill not found" });
       }
 
-      const deleted = await deleteBillsWithPayments(
-        ctx.db,
-        new ObjectId(ctx.session.user.id),
-        [new ObjectId(input.id)],
-      );
+      // Purchase deletion belongs to `bnpl.deletePurchase`, which is the only
+      // endpoint that knows a purchase is one member of a statement. Excluding
+      // them here keeps this mutation symmetric with `update`/`assignGroup`
+      // rather than being a second, undocumented way to delete one.
+      const userOid = new ObjectId(ctx.session.user.id);
+      const ordinary = await ctx.db
+        .collection<BillEvent>("bills")
+        .findOne(
+          { _id: new ObjectId(input.id), userId: userOid, ...NOT_A_PURCHASE },
+          { projection: { _id: 1 } },
+        );
+
+      if (!ordinary) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Bill not found" });
+      }
+
+      const deleted = await deleteBillsWithPayments(ctx.db, userOid, [
+        ordinary._id,
+      ]);
 
       if (deleted === 0) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Bill not found" });
@@ -179,6 +214,11 @@ export const billRouter = createTRPCRouter({
         {
           _id: new ObjectId(input.id),
           userId: new ObjectId(ctx.session.user.id),
+          // Same exclusion as `update`: a BNPL purchase has no place in a group.
+          // `partitionBills` routes it out of every group section, so a groupId
+          // stamped here would never render but would still inflate the group's
+          // bill count on /groups.
+          ...NOT_A_PURCHASE,
         },
         setOps,
       );

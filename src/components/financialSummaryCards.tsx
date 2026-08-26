@@ -17,7 +17,11 @@ import {
   createPayRule,
   partitionBills,
 } from "~/lib/bill-utils";
-import { groupStatements } from "~/lib/bnpl-utils";
+import {
+  groupStatements,
+  isStatementPaid,
+  statementRemaining,
+} from "~/lib/bnpl-utils";
 import {
   formatUtcDate,
   localDateToUtcDateOnly,
@@ -73,15 +77,15 @@ export function FinancialSummaryCards({
     const { bills: ordinaryRows, installments } = partitionBills(periodRows);
     const statements = groupStatements(installments, accounts ?? []);
 
-    // Remaining counts every unpaid peso, installments included — a statement
-    // is unpaid until all of its purchases are.
+    // Remaining counts every unpaid peso, installments included. A statement
+    // contributes only its *unpaid* purchases, not its whole amount — a
+    // statement settled at ₱3,000 that then gains a ₱500 purchase owes ₱500,
+    // and charging the full ₱3,500 would re-bill money already marked paid.
     const remainingBills = sumBy(ordinaryRows, (b) =>
       isOccurrencePaid(paidKeys, b._id, b.date) ? 0 : (b.amount ?? 0),
     );
     const remainingStatements = sumBy(statements, (s) =>
-      s.billIds.every((id) => isOccurrencePaid(paidKeys, id, s.date))
-        ? 0
-        : s.amount,
+      statementRemaining(paidKeys, s),
     );
 
     // Nearest upcoming unpaid obligation of either kind.
@@ -93,8 +97,7 @@ export function FinancialSummaryCards({
     );
     const upcomingStatement = statements.find(
       (s) =>
-        utcDateOnlyToLocal(s.date) >= today &&
-        !s.billIds.every((id) => isOccurrencePaid(paidKeys, id, s.date)),
+        utcDateOnlyToLocal(s.date) >= today && !isStatementPaid(paidKeys, s),
     );
 
     const candidates: Array<{ title: string; date: Date }> = [];

@@ -5,7 +5,12 @@ import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { formatUtcDate } from "~/lib/date-utils";
+import {
+  dateInputToUtcDateOnly,
+  formatUtcDate,
+  localDateToUtcDateOnly,
+  startOfUtcMonth,
+} from "~/lib/date-utils";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -35,11 +40,14 @@ const PurchaseFormSchema = z.object({
 
 export type PurchaseFormValues = z.infer<typeof PurchaseFormSchema>;
 
-/** `"yyyy-MM"` → UTC midnight on the 1st, or undefined when cleared/invalid. */
+/**
+ * `"yyyy-MM"` → UTC midnight on the 1st, or undefined when cleared/invalid.
+ * Defers to the shared date-input parser so any hardening applied there (a
+ * browser parsing quirk, a range check) reaches this field too.
+ */
 function monthInputToUtc(value: string): Date | undefined {
   if (!value) return undefined;
-  const parsed = new Date(`${value}-01`);
-  return isNaN(parsed.getTime()) ? undefined : parsed;
+  return dateInputToUtcDateOnly(`${value}-01`);
 }
 
 // Shared by useForm's initial state and the create-mode reset below, so the
@@ -49,9 +57,11 @@ function defaultPurchaseFormValues(): PurchaseFormValues {
     title: "",
     amount: 0,
     tenureMonths: 6,
-    firstDueMonth: new Date(
-      Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1),
-    ),
+    // The user's *local* calendar month, mapped into the canonical UTC frame.
+    // Reading `getUTCMonth()` off a bare `new Date()` instead would default to
+    // the previous month for the first 8 hours of every month in UTC+8 (the
+    // app's own PHP locale), anchoring the schedule a month in the past.
+    firstDueMonth: startOfUtcMonth(localDateToUtcDateOnly(new Date())),
   };
 }
 

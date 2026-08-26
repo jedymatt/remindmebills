@@ -10,6 +10,7 @@ import {
   UpdateBnplPurchaseInputSchema,
 } from "~/schemas/bnpl";
 import { deleteBillsWithPayments } from "../bill-cascade";
+import { IS_PURCHASE } from "./bill";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 // DB representation — ObjectId fields. See ~/types `BnplAccount` for the
@@ -103,10 +104,13 @@ export const bnplRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { accountOid, userOid } = await assertAccountOwned(ctx, input.id);
 
+      // Destructured once so `nextDueDay` narrows to `number` past the guard
+      // below, with no non-null assertion for the writes that follow.
+      const { name, dueDay: nextDueDay } = input.data;
+
       const updateFields: Partial<Pick<BnplAccountDoc, "name" | "dueDay">> = {};
-      if (input.data.name !== undefined) updateFields.name = input.data.name;
-      if (input.data.dueDay !== undefined)
-        updateFields.dueDay = input.data.dueDay;
+      if (name !== undefined) updateFields.name = name;
+      if (nextDueDay !== undefined) updateFields.dueDay = nextDueDay;
 
       if (Object.keys(updateFields).length === 0) return;
 
@@ -117,11 +121,6 @@ export const bnplRouter = createTRPCRouter({
           { $set: updateFields },
         );
 
-      // Hoisted before the early-return guard below so it stays a plain
-      // `number` for the flatMap, rather than reaching for `input.data.dueDay!`
-      // — `@typescript-eslint/no-non-null-assertion` forbids the assertion, and
-      // this hoist is provably equivalent since nothing reassigns `input`.
-      const nextDueDay = input.data.dueDay;
       if (nextDueDay === undefined) return;
 
       // A new due day must be applied to the purchases already under this
@@ -140,67 +139,73 @@ export const bnplRouter = createTRPCRouter({
       const purchases = await cursor.toArray();
       await cursor.close();
 
-      const ops = purchases.flatMap((purchase) => {
+      const ops: Array<{
+        updateOne: {
+          filter: { _id: ObjectId; userId: ObjectId };
+          update: { $set: { "recurrence.dtstart": Date } };
+        };
+      }> = [];
+      for (const purchase of purchases) {
         const dtstart = purchase.recurrence?.dtstart;
-        if (!dtstart) return [];
+        if (!dtstart) continue;
 
-        return [
-          {
-            updateOne: {
-              filter: { _id: purchase._id, userId: userOid },
-              update: {
-                $set: {
-                  "recurrence.dtstart": deriveStatementDtstart(
-                    nextDueDay,
-                    dtstart,
-                  ),
-                },
-              },
-            },
-          },
-        ];
-      });
-
-      if (ops.length > 0) {
-        await ctx.db.collection("bills").bulkWrite(ops);
-      }
-
-      // Paid-markers are keyed on (billId, occurrenceDate), so moving dtstart
-      // moves the occurrences they point at. Left alone, every paid installment
-      // would revert to unpaid and the stale rows could never be cleared —
-      // markUnpaid needs the occurrence rendered before it can be clicked.
-      // Shift them by the same transform that moved dtstart: month kept, day
-      // replaced. A bill has at most one occurrence per month, so two markers
-      // for one bill always differ in month and can never collide on the new date.
-      const billOids = purchases.map((purchase) => purchase._id);
-      if (billOids.length > 0) {
-        const markerCursor = ctx.db
-          .collection<{
-            _id: ObjectId;
-            billId: ObjectId;
-            occurrenceDate: Date;
-          }>("payments")
-          .find({ userId: userOid, billId: { $in: billOids } });
-        const markers = await markerCursor.toArray();
-        await markerCursor.close();
-
-        const markerOps = markers.map((marker) => ({
+        ops.push({
           updateOne: {
-            filter: { _id: marker._id, userId: userOid },
+            filter: { _id: purchase._id, userId: userOid },
             update: {
               $set: {
-                occurrenceDate: deriveStatementDtstart(
+                "recurrence.dtstart": deriveStatementDtstart(
                   nextDueDay,
-                  marker.occurrenceDate,
+                  dtstart,
                 ),
               },
             },
           },
-        }));
+        });
+      }
 
-        if (markerOps.length > 0) {
-          await ctx.db.collection("payments").bulkWrite(markerOps);
-        }
+      // Guarded because bulkWrite rejects an empty operations array.
+      if (ops.length > 0) {
+        await ctx.db.collection("bills").bulkWrite(ops);
+      }
+
+      // Paid-markers are keyed on (billId, occurrenceDate), and an installment's
+      // marker sits on its *statement* date — the account's due day clamped into
+      // that month (see `groupStatements`). Moving the due day therefore moves
+      // every marker, by the same month-preserving transform: month kept, day
+      // re-derived. Left alone, every paid installment would revert to unpaid
+      // and the stale rows could never be cleared, since markUnpaid needs the
+      // occurrence rendered before it can be clicked.
+      //
+      // A bill has at most one statement per month, so two markers for one bill
+      // always differ in month and can never collide on the new date.
+      const billOids = purchases.map((purchase) => purchase._id);
+      const markerCursor = ctx.db
+        .collection<{
+          _id: ObjectId;
+          billId: ObjectId;
+          occurrenceDate: Date;
+        }>("payments")
+        .find({ userId: userOid, billId: { $in: billOids } });
+      const markers = await markerCursor.toArray();
+      await markerCursor.close();
+
+      const markerOps = markers.map((marker) => ({
+        updateOne: {
+          filter: { _id: marker._id, userId: userOid },
+          update: {
+            $set: {
+              occurrenceDate: deriveStatementDtstart(
+                nextDueDay,
+                marker.occurrenceDate,
+              ),
+            },
+          },
+        },
+      }));
+
+      if (markerOps.length > 0) {
+        await ctx.db.collection("payments").bulkWrite(markerOps);
       }
     }),
 
@@ -392,17 +397,25 @@ export const bnplRouter = createTRPCRouter({
         });
       }
 
-      const deleted = await deleteBillsWithPayments(
-        ctx.db,
-        new ObjectId(ctx.session.user.id),
-        [new ObjectId(input.id)],
-      );
+      const userOid = new ObjectId(ctx.session.user.id);
+      // Guard on bnplAccountId, not just existence — the same rule
+      // `updatePurchase` states. Without it this endpoint deletes any bill the
+      // user owns, plus its entire paid-occurrence history, while reporting
+      // under a "Purchase not found" / "Purchase deleted" contract.
+      const purchase = await ctx.db
+        .collection<PurchaseDoc>("bills")
+        .findOne(
+          { _id: new ObjectId(input.id), userId: userOid, ...IS_PURCHASE },
+          { projection: { _id: 1 } },
+        );
 
-      if (deleted === 0) {
+      if (!purchase) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Purchase not found",
         });
       }
+
+      await deleteBillsWithPayments(ctx.db, userOid, [purchase._id]);
     }),
 });

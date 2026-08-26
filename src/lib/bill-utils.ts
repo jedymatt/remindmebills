@@ -1,6 +1,6 @@
 import { addMonths, isAfter, isBefore, isEqual } from "date-fns";
 import { RRule } from "rrule";
-import { localDateToUtcDateOnly } from "./date-utils";
+import { localDateToUtcDateOnly, utcDateInMonth } from "./date-utils";
 import type { BillEvent, IncomeProfile } from "~/types";
 
 export function getFrequency(freq: "weekly" | "fortnightly" | "monthly") {
@@ -53,10 +53,7 @@ function monthlyOccurrencesInPeriod(
     const monthIndex = startMonth + i * step;
     const year = startYear + Math.floor(monthIndex / 12);
     const month = monthIndex % 12;
-    const lastDayOfMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-    const occ = new Date(
-      Date.UTC(year, month, Math.min(targetDay, lastDayOfMonth)),
-    );
+    const occ = utcDateInMonth(year, month, targetDay);
 
     if (until != null && isAfter(occ, until)) break;
     emitted++;

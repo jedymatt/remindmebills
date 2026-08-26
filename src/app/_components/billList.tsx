@@ -14,7 +14,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { BillModal } from "~/components/billModal";
 import { getPayPeriodsByCount, partitionBills } from "~/lib/bill-utils";
-import { groupStatements } from "~/lib/bnpl-utils";
+import {
+  groupStatements,
+  isStatementPaid,
+  statementKey,
+} from "~/lib/bnpl-utils";
 import { formatUtcDate } from "~/lib/date-utils";
 import { buildPaidLookup, occurrenceKey } from "~/lib/payment-utils";
 import { UNGROUPED_COLOR, colorForOrder } from "~/lib/group-colors";
@@ -360,33 +364,57 @@ function BillListCard({
               );
             })}
 
-            {statements.map((statement, idx) => (
-              <div
-                key={`${statement.accountId}:${statement.date.getTime()}`}
-                className={cn(
-                  (sections.length > 0 || idx > 0) &&
-                    "border-border/40 border-t pt-5",
-                )}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <CreditCard className="text-muted-foreground size-3.5 shrink-0" />
-                    <span className="text-foreground text-sm font-semibold">
-                      {statement.accountName}
-                    </span>
-                    <span className="bg-muted/60 text-muted-foreground ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums">
-                      {statement.purchaseCount}
-                    </span>
-                    <span className="text-muted-foreground ml-1 font-mono text-[11px] tabular-nums">
-                      {formatUtcDate(statement.date, "MMM d")}
+            {statements.map((statement, idx) => {
+              // Settled statements read as settled here too. Without this a paid
+              // statement was indistinguishable from an unpaid one while the
+              // ordinary bills beside it struck through and the summary card
+              // above already reported it as ₱0 remaining. Read-only: the
+              // statement toggle itself lives on /bnpl.
+              const isPaid = isStatementPaid(paidKeys, statement);
+
+              return (
+                <div
+                  key={statementKey(statement.accountId, statement.date)}
+                  className={cn(
+                    (sections.length > 0 || idx > 0) &&
+                      "border-border/40 border-t pt-5",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "flex items-center justify-between",
+                      isPaid && "opacity-40",
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <CreditCard className="text-muted-foreground size-3.5 shrink-0" />
+                      <span
+                        className={cn(
+                          "text-foreground text-sm font-semibold",
+                          isPaid && "line-through",
+                        )}
+                      >
+                        {statement.accountName}
+                      </span>
+                      <span className="bg-muted/60 text-muted-foreground ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums">
+                        {statement.items.length}
+                      </span>
+                      <span className="text-muted-foreground ml-1 font-mono text-[11px] tabular-nums">
+                        {formatUtcDate(statement.date, "MMM d")}
+                      </span>
+                    </div>
+                    <span
+                      className={cn(
+                        "w-24 text-right font-mono text-sm font-medium tracking-tight tabular-nums",
+                        isPaid && "line-through",
+                      )}
+                    >
+                      {formatPHP(statement.amount)}
                     </span>
                   </div>
-                  <span className="w-24 text-right font-mono text-sm font-medium tracking-tight tabular-nums">
-                    {formatPHP(statement.amount)}
-                  </span>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -434,7 +462,11 @@ export function BillList() {
     return () => observer.disconnect();
   }, [billsInPayPeriod.length]);
 
-  if (!incomeProfile || !bills || !groups || !accounts) return null;
+  // `accounts` is deliberately NOT in this guard: a failed or slow `bnpl.getAll`
+  // must not blank the entire pay-period grid for users who have no BNPL
+  // accounts at all. Statements simply fall back to their unnamed form until it
+  // arrives, exactly as the summary cards already do.
+  if (!incomeProfile || !bills || !groups) return null;
 
   const ingoing = incomeProfile.amount ?? 0;
 
@@ -480,7 +512,7 @@ export function BillList() {
             payDate={payDate}
             bills={bills}
             groups={groups}
-            accounts={accounts}
+            accounts={accounts ?? []}
             after={after}
             isCurrent={index === 0}
             ingoing={ingoing}

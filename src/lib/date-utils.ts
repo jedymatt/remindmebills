@@ -57,6 +57,36 @@ export function formatUtcDate(date: Date, formatStr: string): string {
 }
 
 /**
+ * Canonical UTC-midnight date for `day` of the given UTC month (`month` is
+ * 0-indexed), clamped *backward* when that day doesn't exist there: day 31 in
+ * February yields Feb 28, or Feb 29 in a leap year. Rolling forward instead
+ * would push the date into the next month and skip the intended one.
+ *
+ * This is the single spelling of "which day of this month" shared by the monthly
+ * occurrence generator (`monthlyOccurrencesInPeriod`) and BNPL statement
+ * derivation (`deriveStatementDtstart`). The two must answer identically: if
+ * they ever disagreed, a purchase's first statement would land on a different
+ * day from installments 2..N and its account would split into two statements a
+ * month.
+ */
+export function utcDateInMonth(year: number, month: number, day: number): Date {
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(year, month, Math.min(day, lastDay)));
+}
+
+/** First UTC-midnight day of the UTC month `date` falls in. */
+export function startOfUtcMonth(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+}
+
+/** `date` advanced by `months` whole UTC months, anchored on the 1st. */
+export function addUtcMonths(date: Date, months: number): Date {
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, 1),
+  );
+}
+
+/**
  * Parse a native `<input type="date">` value (`"yyyy-MM-dd"`, or `""` when
  * cleared) into a canonical UTC-midnight `Date`, or `undefined` when empty or
  * invalid. The inverse of rendering with `formatUtcDate(value, "yyyy-MM-dd")`:

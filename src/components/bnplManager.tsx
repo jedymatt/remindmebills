@@ -1,13 +1,22 @@
 "use client";
 
-import { addMonths } from "date-fns";
 import { CreditCard, Loader2, Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { computeBillsInPeriod, partitionBills } from "~/lib/bill-utils";
-import { groupStatements, type Statement } from "~/lib/bnpl-utils";
-import { localDateToUtcDateOnly } from "~/lib/date-utils";
-import { buildPaidLookup, occurrenceKey } from "~/lib/payment-utils";
+import {
+  groupStatements,
+  isStatementPaid,
+  statementBillIds,
+  statementKey,
+  type Statement,
+} from "~/lib/bnpl-utils";
+import {
+  addUtcMonths,
+  localDateToUtcDateOnly,
+  startOfUtcMonth,
+} from "~/lib/date-utils";
+import { buildPaidLookup } from "~/lib/payment-utils";
 import { api } from "~/trpc/react";
 import type { BillEvent, BnplAccount } from "~/types";
 import { AuthenticatedLayout } from "./authenticatedLayout";
@@ -60,12 +69,13 @@ export function BnplManager() {
 
   // Both confirmation dialogs name a purchase count so their consequence is
   // concrete. Read from the shared bill list rather than a dedicated endpoint —
-  // the page already needs those rows in Task 8.
+  // the page already needs those rows to render the account cards.
   const { data: allBills } = api.bill.getAll.useQuery();
-  const purchaseCountFor = (accountId: string) =>
-    (allBills ?? []).filter((b) => b.bnplAccountId === accountId).length;
-
-  const deletingPurchaseCount = deleting ? purchaseCountFor(deleting._id) : 0;
+  // Account cards render as soon as `bnpl.getAll` lands, which is typically
+  // before `bill.getAll`. Until the bills arrive a count of 0 would be a claim,
+  // not a fact — and both places that read it drive an irreversible action, so
+  // they must be blocked rather than shown a confident zero.
+  const purchasesLoaded = allBills !== undefined;
 
   const { data: payments } = api.payment.getAll.useQuery();
 
@@ -76,13 +86,16 @@ export function BnplManager() {
   // rules. A 14-month window is enough to always contain the next statement.
   const { purchasesByAccount, statementByAccount } = useMemo(() => {
     const { installments } = partitionBills(allBills ?? []);
-    // Already UTC midnight — localDateToUtcDateOnly maps today's local
-    // calendar day onto the canonical frame the scheduler anchors on.
-    const windowStart = localDateToUtcDateOnly(new Date());
+    // Anchored on the first of the current month, not on today: a statement
+    // whose due day has already passed is still the month's live obligation and
+    // this page holds the only toggle that can settle it. Starting at today
+    // dropped it from the window entirely, silently retargeting the toggle at
+    // next month's statement and leaving the current one unpayable forever.
+    const windowStart = startOfUtcMonth(localDateToUtcDateOnly(new Date()));
     const occurrences = computeBillsInPeriod(
       installments,
       windowStart,
-      addMonths(windowStart, 14),
+      addUtcMonths(windowStart, 14),
     );
     const statements = groupStatements(occurrences, accounts ?? []);
 
@@ -95,7 +108,7 @@ export function BnplManager() {
     }
 
     // The first statement per account is the current one, since groupStatements
-    // sorts by date and the window starts today.
+    // sorts by date and the window starts at the top of this month.
     const statementByAccount = new Map<string, (typeof statements)[number]>();
     for (const statement of statements) {
       if (!statementByAccount.has(statement.accountId)) {
@@ -105,6 +118,17 @@ export function BnplManager() {
 
     return { purchasesByAccount, statementByAccount };
   }, [allBills, accounts]);
+
+  // Derived from the map the memo above already built, rather than a second
+  // independent rescan of `allBills` with its own inlined predicate — the two
+  // could disagree about what counts as an installment, and the copy that
+  // drifted would mislabel a destructive confirmation.
+  const purchaseCountFor = useCallback(
+    (accountId: string) => purchasesByAccount.get(accountId)?.length ?? 0,
+    [purchasesByAccount],
+  );
+
+  const deletingPurchaseCount = deleting ? purchaseCountFor(deleting._id) : 0;
 
   // A changed due day rewrites every existing purchase's schedule, which moves
   // due dates the user may have set months ago. Held here until confirmed.
@@ -145,8 +169,17 @@ export function BnplManager() {
   const handleEditSubmit = (values: AccountFormValues) => {
     if (!editing) return;
 
-    const movesPurchases =
-      values.dueDay !== editing.dueDay && purchaseCountFor(editing._id) > 0;
+    const changesDueDay = values.dueDay !== editing.dueDay;
+
+    // Saving a due-day change with the purchase list still unknown would skip
+    // the confirmation and rewrite every schedule unannounced. Block instead of
+    // guessing zero.
+    if (changesDueDay && !purchasesLoaded) {
+      toast.error("Still loading purchases — try again in a moment");
+      return;
+    }
+
+    const movesPurchases = changesDueDay && purchaseCountFor(editing._id) > 0;
 
     if (movesPurchases) {
       setPendingDueDay({ account: editing, values });
@@ -218,43 +251,56 @@ export function BnplManager() {
     };
   }, [purchaseTarget?.purchase]);
 
-  const markStatementPaid = api.payment.markStatementPaid.useMutation();
-  const markStatementUnpaid = api.payment.markStatementUnpaid.useMutation();
+  // The pending key is cleared from the hook's own `onSettled`, derived from the
+  // variables of the call that settled. Passing per-call callbacks to `mutate`
+  // instead would strand the first key whenever a second toggle starts before
+  // the first resolves: both cards share one mutation observer, and it keeps
+  // only the most recent call's callbacks — leaving that card's button disabled
+  // for good.
+  const settleStatement = {
+    onSettled: (
+      _data: unknown,
+      error: unknown,
+      variables: { accountId: string; statementDate: Date },
+    ) => {
+      if (error) {
+        toast.error(
+          (error as { message?: string }).message ??
+            "Failed to update statement",
+        );
+      }
+      const key = statementKey(variables.accountId, variables.statementDate);
+      const clear = () =>
+        setPendingStatements((prev) => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+      if (error) {
+        clear();
+        return;
+      }
+      void utils.payment.getAll.invalidate().finally(clear);
+    },
+  };
 
-  // A statement is paid only when every purchase on it is paid, so a purchase
-  // added after settling correctly flips it back to unpaid.
-  const isStatementPaid = (statement: Statement) =>
-    statement.billIds.every((billId) =>
-      paidKeys.has(occurrenceKey(billId, statement.date)),
-    );
+  const markStatementPaid =
+    api.payment.markStatementPaid.useMutation(settleStatement);
+  const markStatementUnpaid =
+    api.payment.markStatementUnpaid.useMutation(settleStatement);
 
   const handleToggleStatement = (statement: Statement) => {
-    const key = `${statement.accountId}:${statement.date.getTime()}`;
-    const currentlyPaid = isStatementPaid(statement);
-    setPendingStatements((prev) => new Set(prev).add(key));
-    const clearPending = () =>
-      setPendingStatements((prev) => {
-        const next = new Set(prev);
-        next.delete(key);
-        return next;
-      });
+    const currentlyPaid = isStatementPaid(paidKeys, statement);
+    setPendingStatements((prev) =>
+      new Set(prev).add(statementKey(statement.accountId, statement.date)),
+    );
 
     const mutation = currentlyPaid ? markStatementUnpaid : markStatementPaid;
-    mutation.mutate(
-      {
-        accountId: statement.accountId,
-        statementDate: statement.date,
-        billIds: statement.billIds,
-      },
-      {
-        onSuccess: () =>
-          void utils.payment.getAll.invalidate().finally(clearPending),
-        onError: (error) => {
-          toast.error(error.message || "Failed to update statement");
-          clearPending();
-        },
-      },
-    );
+    mutation.mutate({
+      accountId: statement.accountId,
+      statementDate: statement.date,
+      billIds: statementBillIds(statement),
+    });
   };
 
   return (
@@ -281,9 +327,9 @@ export function BnplManager() {
           <div className="space-y-4">
             {accounts.map((account) => {
               const statement = statementByAccount.get(account._id) ?? null;
-              const statementKey = statement
-                ? `${statement.accountId}:${statement.date.getTime()}`
-                : "";
+              const pendingKey = statement
+                ? statementKey(statement.accountId, statement.date)
+                : null;
 
               return (
                 <BnplAccountCard
@@ -292,9 +338,11 @@ export function BnplManager() {
                   purchases={purchasesByAccount.get(account._id) ?? []}
                   statement={statement}
                   isStatementPaid={
-                    statement ? isStatementPaid(statement) : false
+                    statement ? isStatementPaid(paidKeys, statement) : false
                   }
-                  isStatementPending={pendingStatements.has(statementKey)}
+                  isStatementPending={
+                    pendingKey !== null && pendingStatements.has(pendingKey)
+                  }
                   onToggleStatementPaid={() =>
                     statement && handleToggleStatement(statement)
                   }
@@ -378,11 +426,13 @@ export function BnplManager() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {deleting?.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              {deletingPurchaseCount === 0
-                ? "This account has no purchases."
-                : `This account has ${deletingPurchaseCount} purchase${
-                    deletingPurchaseCount === 1 ? "" : "s"
-                  }. Choose what happens to them.`}
+              {!purchasesLoaded
+                ? "Checking what this account holds…"
+                : deletingPurchaseCount === 0
+                  ? "This account has no purchases."
+                  : `This account has ${deletingPurchaseCount} purchase${
+                      deletingPurchaseCount === 1 ? "" : "s"
+                    }. Choose what happens to them.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {/* Two outcomes rather than one default: deleting destroys purchase
@@ -397,7 +447,11 @@ export function BnplManager() {
                 if (deleting)
                   deleteMut.mutate({ id: deleting._id, purchases: "keep" });
               }}
-              disabled={deleteMut.isPending || deletingPurchaseCount === 0}
+              disabled={
+                deleteMut.isPending ||
+                !purchasesLoaded ||
+                deletingPurchaseCount === 0
+              }
             >
               Keep purchases as ordinary bills
             </AlertDialogAction>
@@ -408,7 +462,7 @@ export function BnplManager() {
                 if (deleting)
                   deleteMut.mutate({ id: deleting._id, purchases: "delete" });
               }}
-              disabled={deleteMut.isPending}
+              disabled={deleteMut.isPending || !purchasesLoaded}
             >
               {deleteMut.isPending && (
                 <Loader2 className="mr-1 size-4 animate-spin" />
