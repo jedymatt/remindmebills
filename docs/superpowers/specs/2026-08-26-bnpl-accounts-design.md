@@ -58,7 +58,7 @@ migration-free: absent means "fall back to `_id` order", the same trick
 
 ### Purchases: `bills` documents with `bnplAccountId`
 
-A BNPL purchase *is* a finite monthly recurring bill, so it reuses the existing
+A BNPL purchase _is_ a finite monthly recurring bill, so it reuses the existing
 `bills` collection and the scheduler that already serves it. One new optional
 field carries the whole distinction:
 
@@ -85,15 +85,33 @@ input schema — an installment with no amount can't contribute to a statement.
 ### Consolidation is structural
 
 `dtstart` is **derived server-side** from the account's `dueDay` plus the first
-due month the user picks. The client never sends it.
-
-This is the load-bearing decision in the design. If each purchase carried its
-own `dtstart`, the one-statement-per-month invariant would hold only as long as
-every entry was made carefully — a convention. Deriving it makes a split
-statement unrepresentable.
+due month the user picks. The client never sends it. If each purchase carried
+its own `dtstart`, the one-statement-per-month invariant would hold only as long
+as every entry was made carefully — a convention.
 
 Derivation clamps to month end, matching `monthlyOccurrencesInPeriod`: first
 month February with `dueDay: 31` yields Feb 28, not a roll into March.
+
+**Derivation alone is not sufficient, and the clamp is why.** A stored anchor
+keeps the clamped day, and `monthlyOccurrencesInPeriod` re-derives its target
+day from that anchor. So with `dueDay: 31`, a purchase first due in February is
+anchored on the 28th and fires on the 28th forever, while a sibling first due in
+March fires on the 31st — one account, two occurrence days, two statements a
+month. Derivation narrows the anchor to a single day per month; it does not make
+the series agree.
+
+The invariant is therefore enforced at the point statements are formed:
+`groupStatements` keys on **(account, calendar month)** and dates each statement
+at the account's `dueDay` clamped into that month, never at an occurrence's own
+day. Anchor drift becomes invisible rather than impossible, and one account can
+emit at most one statement per month regardless of what its purchases carry.
+Dating the statement from the account also puts every paid-marker for it on the
+same day, which is what lets the due-day marker shift (case 4) land exactly.
+
+The deeper fix — store only the first _month_ and derive the day at read time —
+would make drift unrepresentable and remove `bnpl.update`'s fan-out entirely.
+Deferred: it changes the stored shape, and month-grouping already holds the
+invariant.
 
 ## Scheduling and money math
 
@@ -137,8 +155,8 @@ Sep 15 – Sep 29                     +₱1,300
   LazPayLater (1)        Sep 20         ₱900
 ```
 
-This preserves the invariant the file documents today — *the sum of section
-subtotals equals the card's outgoing total* — which would otherwise break the
+This preserves the invariant the file documents today — _the sum of section
+subtotals equals the card's outgoing total_ — which would otherwise break the
 moment a counted amount stopped being itemized. The statement amount is derived
 from that month's active purchases, so it varies correctly as purchases finish.
 
@@ -148,14 +166,18 @@ month, so a fortnightly pay period holds zero or one roll-up row per account.
 ### `financialSummaryCards.tsx`
 
 - **Total Bills** — each account's statement counts as **1**, not N purchases.
-- **Remaining** — includes unpaid statements.
+- **Remaining** — includes each statement's **unpaid purchases**, not the whole
+  statement amount. A statement settled at ₱3,000 that then gains a ₱500
+  purchase (or a tenure increase) owes ₱500, not ₱3,500.
 - **Next Bill** — a statement competes with ordinary bills on date; when one
   wins, the card shows the account name and the statement amount.
 
 ### Paid state
 
 Paid is per **(account, statement date)**, not per purchase: you settle one
-statement, so one toggle. Accounts settle independently.
+statement, so one toggle. Accounts settle independently. The markers are still
+per purchase underneath, so a statement that gains a purchase after settlement
+reads unpaid again and owes only the new amount.
 
 New bulk procedures take an account id and a statement date and write (or
 delete) a `payments` document for each of that account's purchases due then:
@@ -180,7 +202,7 @@ split up front because `groupManager.tsx` is already 400+ lines.
 
 | File                                        | Responsibility                                        |
 | ------------------------------------------- | ----------------------------------------------------- |
-| `src/app/bnpl/page.tsx`                     | RSC shell, `force-dynamic`, renders `<BnplManager />`  |
+| `src/app/bnpl/page.tsx`                     | RSC shell, `force-dynamic`, renders `<BnplManager />` |
 | `src/components/bnplManager.tsx`            | Account list, empty state, orchestration              |
 | `src/components/bnplAccountCard.tsx`        | One account: header, current statement, its purchases |
 | `src/components/bnplAccountFormDialog.tsx`  | Create/edit account (name, due day)                   |
@@ -198,8 +220,11 @@ statement with its paid toggle, then its purchases with monthly amount and
 
 Two terms used above, defined once here:
 
-- **Current statement** — the account's next unelapsed due date (today's date
-  included), and the purchases with an installment falling on it.
+- **Current statement** — the account's earliest statement from the start of the
+  current month onward, and the purchases with an installment falling on it. The
+  window opens at the month start, not at today, so a statement whose due date
+  has passed unpaid stays on the card and settleable — `/bnpl` holds the only
+  statement toggle in the app, so dropping it there would strand it.
 - **Committed total** — the sum of `amount` across the purchases in the current
   statement. It is the statement's amount, and it shrinks as purchases finish.
 
@@ -284,8 +309,8 @@ the same clamping, rather than assuming the generator will cover it.
 ### 4. Deleting a single purchase also deletes its paid-markers
 
 Background: marking something paid does not modify the bill. It writes a tiny
-separate document into the `payments` collection that says, in effect, *"bill X,
-the occurrence on date Y, is settled."* It holds no amount — just that pairing.
+separate document into the `payments` collection that says, in effect, _"bill X,
+the occurrence on date Y, is settled."_ It holds no amount — just that pairing.
 Paid state is the presence of such a marker; unpaid is its absence.
 
 That means deleting a bill without deleting its markers leaves rows pointing at
@@ -315,22 +340,22 @@ every consumer of `bill.getAll` was checked, and the result is below rather than
 left as "remember to look during implementation". Two of them correctly need no
 change, for opposite reasons:
 
-| Consumer                                   | Action                                                                                                  |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `billList.tsx:354`                         | **Partition** — group rows vs roll-up row                                                               |
-| `financialSummaryCards.tsx`                | **Partition** — a statement counts as 1                                                                 |
-| `playgroundStartScreen.tsx:31`             | **Partition** — "clone my bills" would otherwise drag purchases into the playground as loose bills       |
-| `dashboardPage.tsx:133`                    | **No change, deliberately** — `hasBills` must count purchases, or a BNPL-only user sees "No bills yet"   |
-| `groupManager.tsx:232`                     | **No change** — already filters on `groupId`, which purchases never carry                                |
-| `billModal`, `billViewMode`, `createBillForm` | **No change** — invalidation only; roll-up rows are not clickable                                     |
+| Consumer                                      | Action                                                                                                 |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `billList.tsx:354`                            | **Partition** — group rows vs roll-up row                                                              |
+| `financialSummaryCards.tsx`                   | **Partition** — a statement counts as 1                                                                |
+| `playgroundStartScreen.tsx:31`                | **Partition** — "clone my bills" would otherwise drag purchases into the playground as loose bills     |
+| `dashboardPage.tsx:133`                       | **No change, deliberately** — `hasBills` must count purchases, or a BNPL-only user sees "No bills yet" |
+| `groupManager.tsx:232`                        | **No change** — already filters on `groupId`, which purchases never carry                              |
+| `billModal`, `billViewMode`, `createBillForm` | **No change** — invalidation only; roll-up rows are not clickable                                      |
 
 `playgroundStartScreen` is the subtle one: a purchase clones perfectly into the
-playground *because* it is a structurally valid recurring bill, reappearing as
+playground _because_ it is a structurally valid recurring bill, reappearing as
 individual rows in the one surface declared out of scope.
 
 ### 6. Editing a purchase can strand its paid-markers too
 
-Case 1 covers the due-day path, where the *day* moves and markers shift with it.
+Case 1 covers the due-day path, where the _day_ moves and markers shift with it.
 Editing a purchase moves things case 1's reasoning does not cover, and the same
 harm follows:
 

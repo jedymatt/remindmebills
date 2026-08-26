@@ -20,11 +20,18 @@ pnpm format:check     # Prettier check
 pnpm format:write     # Prettier auto-format
 ```
 
-No test framework is configured.
+```bash
+pnpm test             # Vitest run (pure helpers in `src/**/*.test.ts`)
+pnpm test:watch       # Vitest watch mode
+```
+
+Vitest covers pure helpers only — there is no harness for tRPC routers or
+components, so router logic is verified by review and by hand.
 
 ## Architecture
 
 ### Tech Stack
+
 - **Framework:** Next.js 16 (App Router, RSC)
 - **Language:** TypeScript (strict mode), path alias `~/` → `src/`
 - **API:** tRPC 11 with SuperJSON transformer — type-safe end-to-end RPC
@@ -35,8 +42,9 @@ No test framework is configured.
 - **Env validation:** `@t3-oss/env-nextjs` in `src/env.js`
 
 ### Key Directories
+
 - `src/app/` — Next.js App Router pages and layouts
-- `src/server/api/routers/` — tRPC routers (`bill`, `income`, `post`)
+- `src/server/api/routers/` — tRPC routers (`bill`, `bnpl`, `group`, `income`, `payment`, `post`)
 - `src/server/api/trpc.ts` — tRPC initialization, context, `publicProcedure`/`protectedProcedure`
 - `src/server/api/root.ts` — tRPC app router combining all sub-routers
 - `src/server/auth/` — Better Auth configuration
@@ -50,13 +58,16 @@ No test framework is configured.
 - `src/lib/bill-utils.ts` — Recurrence helpers using rrule (pay rules, bill scheduling)
 
 ### Routes
+
 - `/` — Home/landing page
 - `/dashboard` — Main bill dashboard (protected)
-- `/bills` — Bill list (protected)
 - `/bills/create` — Create bill form (protected)
+- `/groups` — Bill group management (protected)
+- `/bnpl` — BNPL account management: accounts, purchases, statement settling (protected)
 - `/playground` — Guest-accessible demo area with local-only bill state
 
 ### API Pattern (tRPC)
+
 - Routers live in `src/server/api/routers/`. Each exports a router created with `createTRPCRouter`.
 - Use `protectedProcedure` for authenticated endpoints; it guarantees `ctx.session.user` is non-null.
 - Use `publicProcedure` for unauthenticated endpoints.
@@ -65,14 +76,17 @@ No test framework is configured.
 - Server calls (RSC): use the caller from `src/trpc/server.ts`.
 
 ### Auth
+
 - Better Auth configured in `src/server/auth/config.ts` with MongoDB adapter.
 - Providers: Google OAuth, anonymous sign-in (guest mode).
-- Route protection via Next.js middleware in `src/proxy.ts` — checks session for `/dashboard`. Uses optimistic redirect (not fully secure per Better Auth docs) — handle auth checks in individual pages too.
+- Route protection via Next.js middleware in `src/proxy.ts` — checks session for `/dashboard`, `/playground`, `/groups`, and `/bnpl`. Uses optimistic redirect (not fully secure per Better Auth docs) — handle auth checks in individual pages too.
 - Client auth: `src/lib/auth-client.ts` exports `authClient` with `signIn`, `signOut`, `useSession`.
 
 ### Forms & Validation
+
 - React Hook Form with Zod schemas. Use `useWatch` (not `form.watch`) for reactive field watching.
 - Bill creation uses a Zod discriminated union: single bills (with `date`) vs recurring bills (with `recurrence` using rrule).
 
 ### Environment Variables
+
 Required: `MONGODB_URI`, `BETTER_AUTH_URL`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`. `BETTER_AUTH_SECRET` is required in production. Set `SKIP_ENV_VALIDATION=1` to bypass validation (useful for Docker builds).
