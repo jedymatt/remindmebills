@@ -22,6 +22,9 @@ type BillEvent = Simplify<
     _id: ObjectId;
     userId: ObjectId;
     groupId?: ObjectId | null;
+    // Present only on BNPL purchases (see `bnplRouter`); typed here so the
+    // `update` mutation's filter can exclude them without an `as` cast.
+    bnplAccountId?: ObjectId;
   } & Omit<InputBill, "groupId">
 >;
 
@@ -114,6 +117,14 @@ export const billRouter = createTRPCRouter({
         {
           _id: new ObjectId(input.id),
           userId: new ObjectId(ctx.session.user.id),
+          // This mutation accepts a client-supplied `recurrence`, including
+          // `dtstart` — a BNPL purchase's `dtstart` must only ever be derived
+          // server-side from its account's due day, since that derivation is
+          // what makes a split statement unrepresentable. Excluding purchases
+          // from the filter (rather than checking after the fact) makes a
+          // purchase id read as the existing "Bill not found"; purchase edits
+          // belong to `bnpl.updatePurchase`.
+          bnplAccountId: { $exists: false },
         },
         setOps,
       );

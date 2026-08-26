@@ -282,10 +282,20 @@ export const bnplRouter = createTRPCRouter({
 
       const userOid = new ObjectId(ctx.session.user.id);
       const purchase = await ctx.db
-        .collection<{ _id: ObjectId; bnplAccountId?: ObjectId }>("bills")
+        .collection<{
+          _id: ObjectId;
+          bnplAccountId?: ObjectId;
+          recurrence?: { dtstart: Date; count?: number };
+        }>("bills")
         .findOne(
           { _id: new ObjectId(input.id), userId: userOid },
-          { projection: { bnplAccountId: 1 } },
+          {
+            projection: {
+              bnplAccountId: 1,
+              "recurrence.dtstart": 1,
+              "recurrence.count": 1,
+            },
+          },
         );
 
       // Guard on bnplAccountId, not just existence: this endpoint must not be
@@ -302,6 +312,14 @@ export const bnplRouter = createTRPCRouter({
         purchase.bnplAccountId.toHexString(),
       );
 
+      const previousDtstart = purchase.recurrence?.dtstart;
+      const previousCount = purchase.recurrence?.count;
+      const nextDtstart = deriveStatementDtstart(
+        dueDay,
+        input.data.firstDueMonth,
+      );
+      const nextCount = input.data.tenureMonths;
+
       await ctx.db.collection("bills").updateOne(
         { _id: purchase._id, userId: userOid },
         {
@@ -312,12 +330,56 @@ export const bnplRouter = createTRPCRouter({
             recurrence: {
               type: "monthly",
               interval: 1,
-              dtstart: deriveStatementDtstart(dueDay, input.data.firstDueMonth),
-              count: input.data.tenureMonths,
+              dtstart: nextDtstart,
+              count: nextCount,
             },
           },
         },
       );
+
+      // Reconcile paid-markers against the new schedule. Markers are keyed on
+      // (billId, occurrenceDate); if the schedule they point at no longer
+      // produces that occurrence, they become unrenderable and thus
+      // unclearable (see edge case 6 in the design doc).
+      if (
+        previousDtstart &&
+        previousDtstart.getTime() !== nextDtstart.getTime()
+      ) {
+        // The first month moved, not just the day-of-month. Unlike the
+        // due-day path (which only shifts the day and keeps every marker's
+        // month, so shifting markers the same way preserves them), a
+        // first-month change redefines which month is installment 1 — a
+        // marker for "March" would silently become a marker for whatever
+        // installment now falls in March. There is no correct shift, so
+        // every marker for this bill is deleted rather than moved: the
+        // schedule was redefined and prior paid records no longer correspond
+        // to anything the user can see.
+        await ctx.db
+          .collection("payments")
+          .deleteMany({ userId: userOid, billId: purchase._id });
+      } else if (previousCount !== undefined && nextCount < previousCount) {
+        // Only the tenure shrank. Markers for installments that still exist
+        // stay valid; only markers past the new final occurrence are stale.
+        // Reuse the tested statement-derivation helper (with the same
+        // month-end clamping the generator applies) rather than hand-rolling
+        // the month arithmetic.
+        const finalMonth = new Date(
+          Date.UTC(
+            nextDtstart.getUTCFullYear(),
+            nextDtstart.getUTCMonth() + nextCount - 1,
+            1,
+          ),
+        );
+        const newFinalOccurrence = deriveStatementDtstart(dueDay, finalMonth);
+
+        await ctx.db.collection("payments").deleteMany({
+          userId: userOid,
+          billId: purchase._id,
+          occurrenceDate: { $gt: newFinalOccurrence },
+        });
+      }
+      // Otherwise (title/amount only, or a tenure increase): no schedule
+      // change reaches an existing occurrence, so markers stay untouched.
     }),
 
   deletePurchase: protectedProcedure

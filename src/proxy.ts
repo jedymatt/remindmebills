@@ -19,5 +19,5 @@ export default async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard", "/playground", "/groups"], // Specify the routes the middleware applies to
+  matcher: ["/dashboard", "/playground", "/groups", "/bnpl"], // Specify the routes the middleware applies to
 };
