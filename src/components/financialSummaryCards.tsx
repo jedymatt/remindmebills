@@ -12,7 +12,16 @@ import { startOfDay } from "date-fns";
 import { sumBy } from "lodash";
 import { Card, CardContent } from "~/components/ui/card";
 import { cn } from "~/lib/utils";
-import { createPayRule, computeBillsInPeriod } from "~/lib/bill-utils";
+import {
+  computeBillsInPeriod,
+  createPayRule,
+  partitionBills,
+} from "~/lib/bill-utils";
+import {
+  groupStatements,
+  isStatementPaid,
+  statementRemaining,
+} from "~/lib/bnpl-utils";
 import {
   formatUtcDate,
   localDateToUtcDateOnly,
@@ -54,36 +63,71 @@ export function FinancialSummaryCards({
 }) {
   const { data: payments } = api.payment.getAll.useQuery();
   const paidKeys = useMemo(() => buildPaidLookup(payments ?? []), [payments]);
+  const { data: accounts } = api.bnpl.getAll.useQuery();
 
-  const { remaining, nextBill } = useMemo(() => {
+  const { remaining, nextItem } = useMemo(() => {
     const payRule = createPayRule(incomeProfile);
     const currentPay = payRule.before(localDateToUtcDateOnly(new Date()), true);
-    if (!currentPay) return { remaining: 0, nextBill: null };
+    if (!currentPay) return { remaining: 0, nextItem: null };
 
     const nextPayDate = payRule.after(currentPay);
-    if (!nextPayDate) return { remaining: 0, nextBill: null };
+    if (!nextPayDate) return { remaining: 0, nextItem: null };
 
-    const periodBills = computeBillsInPeriod(bills, currentPay, nextPayDate);
+    const periodRows = computeBillsInPeriod(bills, currentPay, nextPayDate);
+    const { bills: ordinaryRows, installments } = partitionBills(periodRows);
+    const statements = groupStatements(installments, accounts ?? []);
 
-    // What's still owed this period — paid occurrences contribute 0. A plain
-    // remaining-to-pay total (no income term), so it stays coherent and shrinks
-    // toward ₱0 as bills are marked paid, whatever the income is.
-    const remaining = sumBy(periodBills, (b) =>
+    // Remaining counts every unpaid peso, installments included. A statement
+    // contributes only its *unpaid* purchases, not its whole amount — a
+    // statement settled at ₱3,000 that then gains a ₱500 purchase owes ₱500,
+    // and charging the full ₱3,500 would re-bill money already marked paid.
+    const remainingBills = sumBy(ordinaryRows, (b) =>
       isOccurrencePaid(paidKeys, b._id, b.date) ? 0 : (b.amount ?? 0),
     );
+    const remainingStatements = sumBy(statements, (s) =>
+      statementRemaining(paidKeys, s),
+    );
 
-    // Nearest upcoming *unpaid* bill (today or future). Day-granularity compare:
-    // bill dates are at midnight, so `b.date >= new Date()` would drop a bill due
-    // today once the wall clock passes midnight.
+    // Nearest upcoming unpaid obligation of either kind.
     const today = startOfDay(new Date());
-    const upcoming = periodBills.find(
+    const upcomingBill = ordinaryRows.find(
       (b) =>
         utcDateOnlyToLocal(b.date) >= today &&
         !isOccurrencePaid(paidKeys, b._id, b.date),
     );
+    const upcomingStatement = statements.find(
+      (s) =>
+        utcDateOnlyToLocal(s.date) >= today && !isStatementPaid(paidKeys, s),
+    );
 
-    return { remaining, nextBill: upcoming ?? null };
-  }, [incomeProfile, bills, paidKeys]);
+    const candidates: Array<{ title: string; date: Date }> = [];
+    if (upcomingBill)
+      candidates.push({ title: upcomingBill.title, date: upcomingBill.date });
+    if (upcomingStatement)
+      candidates.push({
+        title: upcomingStatement.accountName,
+        date: upcomingStatement.date,
+      });
+    candidates.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    return {
+      remaining: remainingBills + remainingStatements,
+      nextItem: candidates[0] ?? null,
+    };
+  }, [incomeProfile, bills, paidKeys, accounts]);
+
+  // Counted independently of the pay period. A statement is one obligation
+  // whenever it falls, and this card has always been whole-list ("Active
+  // bills"). Deriving it inside the period memo would make it read 0 whenever
+  // no current pay period resolves — e.g. a profile whose start date is still
+  // in the future.
+  const billCount = useMemo(() => {
+    const { bills: ordinaryAll, installments } = partitionBills(bills);
+    const accountsWithPurchases = new Set(
+      installments.map((b) => b.bnplAccountId),
+    );
+    return ordinaryAll.length + accountsWithPurchases.size;
+  }, [bills]);
 
   const income = incomeProfile.amount ?? 0;
 
@@ -98,7 +142,7 @@ export function FinancialSummaryCards({
     {
       icon: FileText,
       label: "Total Bills",
-      value: bills.length.toString(),
+      value: billCount.toString(),
       subtitle: "Active bills",
       mono: true,
     },
@@ -113,8 +157,10 @@ export function FinancialSummaryCards({
     {
       icon: CalendarClock,
       label: "Next Bill",
-      value: nextBill?.title ?? "None",
-      subtitle: nextBill ? formatUtcDate(nextBill.date, "MMM dd, yyyy") : "No upcoming bills",
+      value: nextItem?.title ?? "None",
+      subtitle: nextItem
+        ? formatUtcDate(nextItem.date, "MMM dd, yyyy")
+        : "No upcoming bills",
       mono: false,
     },
   ];

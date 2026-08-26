@@ -13,6 +13,10 @@ export type BillEvent = {
   amount?: number;
   userId: string;
   groupId?: string | null;
+  // Present = this bill is a BNPL installment purchase, and names the account
+  // it belongs to. Absent = an ordinary bill. Presence is the only
+  // discriminator, which is why no migration was needed to introduce it.
+  bnplAccountId?: string | null;
 } & (Single | Recurring);
 
 // PlaygroundBillData: bill fields without the local id.
@@ -36,6 +40,17 @@ export type PlaygroundBill =
       type: "recurring";
       recurrence: Recurrence;
     };
+
+// A BNPL provider account (Shopee SPayLater, LazPayLater, …). The account owns
+// the shared monthly `dueDay`: every purchase under it derives its schedule from
+// that day, which is what makes one consolidated statement per month structural
+// rather than a data-entry convention.
+export interface BnplAccount {
+  _id: string;
+  userId: string;
+  name: string;
+  dueDay: number;
+}
 
 export interface IncomeProfile {
   payFrequency: "weekly" | "fortnightly" | "monthly";

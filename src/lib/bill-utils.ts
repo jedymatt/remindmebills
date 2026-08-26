@@ -1,6 +1,10 @@
 import { addMonths, isAfter, isBefore, isEqual } from "date-fns";
 import { RRule } from "rrule";
-import { localDateToUtcDateOnly } from "./date-utils";
+import {
+  addUtcMonths,
+  localDateToUtcDateOnly,
+  utcDateInMonth,
+} from "./date-utils";
 import type { BillEvent, IncomeProfile } from "~/types";
 
 export function getFrequency(freq: "weekly" | "fortnightly" | "monthly") {
@@ -39,8 +43,6 @@ function monthlyOccurrencesInPeriod(
   periodEnd: Date,
 ) {
   const targetDay = dtstart.getUTCDate();
-  const startYear = dtstart.getUTCFullYear();
-  const startMonth = dtstart.getUTCMonth();
   const step = Math.max(1, interval);
 
   const occurrences: Date[] = [];
@@ -50,13 +52,7 @@ function monthlyOccurrencesInPeriod(
   for (let i = 0; i < 12_000; i++) {
     if (count != null && emitted >= count) break;
 
-    const monthIndex = startMonth + i * step;
-    const year = startYear + Math.floor(monthIndex / 12);
-    const month = monthIndex % 12;
-    const lastDayOfMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-    const occ = new Date(
-      Date.UTC(year, month, Math.min(targetDay, lastDayOfMonth)),
-    );
+    const occ = utcDateInMonth(addUtcMonths(dtstart, i * step), targetDay);
 
     if (until != null && isAfter(occ, until)) break;
     emitted++;
@@ -187,4 +183,34 @@ export function getPayPeriodsByCount(
       after: payRule.after(payDate),
     };
   });
+}
+
+/**
+ * Split rows into ordinary bills and BNPL installments.
+ *
+ * BNPL purchases share the `bills` collection, so `bill.getAll` returns both
+ * kinds. This is the single place that filter is spelled: a polymorphic
+ * collection rots when each call site writes its own predicate, and a missed
+ * one leaks installments back into a list as individual rows — the exact
+ * clutter the BNPL feature removes.
+ *
+ * Generic over the element type because two shapes need it: raw `BillEvent`s
+ * (the summary cards) and generated occurrence rows (`BillEvent & { date: Date }`,
+ * the bill list).
+ */
+export function partitionBills<T extends { bnplAccountId?: string | null }>(
+  rows: T[],
+): { bills: T[]; installments: T[] } {
+  const bills: T[] = [];
+  const installments: T[] = [];
+
+  for (const row of rows) {
+    if (row.bnplAccountId) {
+      installments.push(row);
+    } else {
+      bills.push(row);
+    }
+  }
+
+  return { bills, installments };
 }

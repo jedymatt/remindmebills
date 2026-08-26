@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type PropsWithChildren } from "react";
 import {
+  CreditCard,
   FlaskConical,
   FolderTree,
   LayoutDashboard,
@@ -100,6 +101,7 @@ function UserNav() {
 const navLinks: Array<{ href: string; label: string; icon: LucideIcon }> = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/groups", label: "Groups", icon: FolderTree },
+  { href: "/bnpl", label: "BNPL", icon: CreditCard },
   { href: "/playground", label: "Playground", icon: FlaskConical },
 ];
 
@@ -108,7 +110,7 @@ export function AuthenticatedLayout({ children }: PropsWithChildren) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <div className="bg-ledger-paper text-ledger-ink font-sans flex min-h-svh flex-col antialiased">
+    <div className="bg-ledger-paper text-ledger-ink flex min-h-svh flex-col font-sans antialiased">
       <header className="border-ledger-line bg-ledger-paper/80 sticky top-0 z-50 w-full border-b backdrop-blur">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
           <div className="flex items-center gap-6">

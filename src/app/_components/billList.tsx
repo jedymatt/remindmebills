@@ -5,6 +5,7 @@ import { sumBy } from "lodash";
 import {
   Circle,
   CircleCheckBig,
+  CreditCard,
   EyeClosedIcon,
   EyeIcon,
   Sparkles,
@@ -12,13 +13,18 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { BillModal } from "~/components/billModal";
-import { getPayPeriodsByCount } from "~/lib/bill-utils";
+import { getPayPeriodsByCount, partitionBills } from "~/lib/bill-utils";
+import {
+  groupStatements,
+  isStatementPaid,
+  statementKey,
+} from "~/lib/bnpl-utils";
 import { formatUtcDate } from "~/lib/date-utils";
 import { buildPaidLookup, occurrenceKey } from "~/lib/payment-utils";
 import { UNGROUPED_COLOR, colorForOrder } from "~/lib/group-colors";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
-import type { BillEvent, Group } from "~/types";
+import type { BillEvent, BnplAccount, Group } from "~/types";
 
 function formatPHP(value: number, signDisplay?: "always") {
   return value.toLocaleString("en-PH", {
@@ -170,6 +176,7 @@ function BillRowItem({
 function BillListCard({
   bills,
   groups,
+  accounts,
   payDate,
   after,
   isCurrent,
@@ -181,6 +188,7 @@ function BillListCard({
 }: {
   bills: BillRow[];
   groups: Group[];
+  accounts: BnplAccount[];
   payDate: Date;
   after: Date | null;
   isCurrent: boolean;
@@ -192,11 +200,26 @@ function BillListCard({
 }) {
   const [excludedBills, setExcludedBills] = useState<string[]>([]);
 
-  const sections = useMemo(() => buildSections(bills, groups), [bills, groups]);
+  const { bills: ordinaryBills, installments } = useMemo(
+    () => partitionBills(bills),
+    [bills],
+  );
 
-  // Paid occurrences stay in the period sums — the card balance is a stable
-  // income−all-bills projection, not "cash left". Paid is shown as a struck row;
-  // "remaining to pay" lives in the summary cards instead.
+  const sections = useMemo(
+    () => buildSections(ordinaryBills, groups),
+    [ordinaryBills, groups],
+  );
+
+  const statements = useMemo(
+    () => groupStatements(installments, accounts),
+    [installments, accounts],
+  );
+
+  // Paid bills and installments both stay in this sum rather than dropping out:
+  // paid shows as a struck row instead (balance is income−all-bills, not "cash
+  // left" — "remaining to pay" lives in the summary cards), and installments are
+  // itemized as one roll-up row per account below, so section subtotals plus
+  // statement amounts still equal `outgoing`.
   const outgoing = useMemo(
     () =>
       sumBy(
@@ -270,7 +293,7 @@ function BillListCard({
 
       {/* Sections */}
       <div className="flex-1 px-5 pb-5">
-        {bills.length === 0 ? (
+        {ordinaryBills.length === 0 && statements.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-8 text-center">
             <Sparkles className="text-muted-foreground/40 size-5" />
             <p className="text-muted-foreground text-sm">
@@ -340,6 +363,58 @@ function BillListCard({
                 </div>
               );
             })}
+
+            {statements.map((statement, idx) => {
+              // Settled statements read as settled here too. Without this a paid
+              // statement was indistinguishable from an unpaid one while the
+              // ordinary bills beside it struck through and the summary card
+              // above already reported it as ₱0 remaining. Read-only: the
+              // statement toggle itself lives on /bnpl.
+              const isPaid = isStatementPaid(paidKeys, statement);
+
+              return (
+                <div
+                  key={statementKey(statement.accountId, statement.date)}
+                  className={cn(
+                    (sections.length > 0 || idx > 0) &&
+                      "border-border/40 border-t pt-5",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "flex items-center justify-between",
+                      isPaid && "opacity-40",
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <CreditCard className="text-muted-foreground size-3.5 shrink-0" />
+                      <span
+                        className={cn(
+                          "text-foreground text-sm font-semibold",
+                          isPaid && "line-through",
+                        )}
+                      >
+                        {statement.accountName}
+                      </span>
+                      <span className="bg-muted/60 text-muted-foreground ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums">
+                        {statement.items.length}
+                      </span>
+                      <span className="text-muted-foreground ml-1 font-mono text-[11px] tabular-nums">
+                        {formatUtcDate(statement.date, "MMM d")}
+                      </span>
+                    </div>
+                    <span
+                      className={cn(
+                        "w-24 text-right font-mono text-sm font-medium tracking-tight tabular-nums",
+                        isPaid && "line-through",
+                      )}
+                    >
+                      {formatPHP(statement.amount)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -354,6 +429,7 @@ export function BillList() {
   const { data: bills } = api.bill.getAll.useQuery();
   const { data: incomeProfile } = api.income.getIncomeProfile.useQuery();
   const { data: groups } = api.group.getAll.useQuery();
+  const { data: accounts } = api.bnpl.getAll.useQuery();
   const { data: payments } = api.payment.getAll.useQuery();
   const utils = api.useUtils();
   const markPaid = api.payment.markPaid.useMutation();
@@ -386,6 +462,10 @@ export function BillList() {
     return () => observer.disconnect();
   }, [billsInPayPeriod.length]);
 
+  // `accounts` is deliberately NOT in this guard: a failed or slow `bnpl.getAll`
+  // must not blank the entire pay-period grid for users who have no BNPL
+  // accounts at all. Statements simply fall back to their unnamed form until it
+  // arrives, exactly as the summary cards already do.
   if (!incomeProfile || !bills || !groups) return null;
 
   const ingoing = incomeProfile.amount ?? 0;
@@ -432,6 +512,7 @@ export function BillList() {
             payDate={payDate}
             bills={bills}
             groups={groups}
+            accounts={accounts ?? []}
             after={after}
             isCurrent={index === 0}
             ingoing={ingoing}

@@ -1,0 +1,409 @@
+# BNPL Accounts — Design
+
+Issue: [#44](https://github.com/jedymatt/remindmebills/issues/44) — "add separate section for managing shopee's spaylater items"
+
+## Problem
+
+Buy-now-pay-later purchases (Shopee SPayLater, Lazada LazPayLater, and similar)
+can be entered today as ordinary recurring bills, but they clutter the
+pay-period bill list. A single month can hold a dozen installment rows that the
+user thinks of as one payment.
+
+They also don't behave like ordinary bills. A BNPL provider **consolidates**:
+every active purchase's installment for the month lands on one statement, with
+one due date and one payment. Modelling each purchase as an independently
+scheduled bill misrepresents both the schedule and the payment.
+
+## Goals
+
+- Manage BNPL purchases on their own page, out of the pay-period bill list.
+- Keep their money in the dashboard's totals, so projections stay honest.
+- Support multiple providers as first-class **accounts**, each with its own
+  billing cycle, settled independently.
+
+## Non-goals
+
+Deliberately excluded from this pass, and listed so the omissions are on the
+record rather than forgotten:
+
+- Interest, fees, or processing charges; original purchase price; total payable.
+- Payoff-progress reporting beyond a per-purchase "3 of 6" count.
+- Credit limits and utilization.
+- Provider presets (a curated list of BNPL brands with icons/colours).
+- Reordering accounts, and per-account colour coding.
+- Playground support — `PlaygroundBill` is local-only demo state and gains
+  nothing from a second entity shape.
+
+## Model
+
+### `bnpl_accounts` (new collection)
+
+Many per user, one document per provider account.
+
+| Field    | Type       | Notes                                    |
+| -------- | ---------- | ---------------------------------------- |
+| `_id`    | `ObjectId` |                                          |
+| `userId` | `ObjectId` |                                          |
+| `name`   | `string`   | Free text, e.g. "SPayLater". 1–50 chars. |
+| `dueDay` | `number`   | Day of month, 1–31.                      |
+
+Accounts are listed in creation order via `.sort({ _id: 1 })`. There is
+deliberately **no `order` field**: ObjectIds are timestamp-prefixed, so `_id`
+already gives a stable insertion-order sort with nothing to write or keep
+consistent. `groups` carries `order` because it earns two jobs there — the
+drag-reorder mutation and `colorForOrder` swatch derivation — and neither
+applies here. Should reordering ever land, adding `order` then is
+migration-free: absent means "fall back to `_id` order", the same trick
+`bnplAccountId` relies on.
+
+### Purchases: `bills` documents with `bnplAccountId`
+
+A BNPL purchase _is_ a finite monthly recurring bill, so it reuses the existing
+`bills` collection and the scheduler that already serves it. One new optional
+field carries the whole distinction:
+
+```ts
+bnplAccountId?: ObjectId;   // present = BNPL installment, and says which account
+```
+
+Presence is the discriminator, so no separate `kind` enum is needed and the
+account's identity is stored exactly once. An absent field means an ordinary
+bill, so **existing documents need no migration**.
+
+A purchase is stored as:
+
+| Field        | Value                                                            |
+| ------------ | ---------------------------------------------------------------- |
+| `type`       | `"recurring"`                                                    |
+| `recurrence` | `{ type: "monthly", interval: 1, dtstart, count: tenureMonths }` |
+| `amount`     | The monthly installment. **Required** for purchases.             |
+| `groupId`    | Never set. Group UI is not offered for purchases.                |
+
+`amount` is optional on the shared bill schema but required by the purchase
+input schema — an installment with no amount can't contribute to a statement.
+
+### Consolidation is structural
+
+`dtstart` is **derived server-side** from the account's `dueDay` plus the first
+due month the user picks. The client never sends it. If each purchase carried
+its own `dtstart`, the one-statement-per-month invariant would hold only as long
+as every entry was made carefully — a convention.
+
+Derivation clamps to month end, matching `monthlyOccurrencesInPeriod`: first
+month February with `dueDay: 31` yields Feb 28, not a roll into March.
+
+**Derivation alone is not sufficient, and the clamp is why.** A stored anchor
+keeps the clamped day, and `monthlyOccurrencesInPeriod` re-derives its target
+day from that anchor. So with `dueDay: 31`, a purchase first due in February is
+anchored on the 28th and fires on the 28th forever, while a sibling first due in
+March fires on the 31st — one account, two occurrence days, two statements a
+month. Derivation narrows the anchor to a single day per month; it does not make
+the series agree.
+
+The invariant is therefore enforced at the point statements are formed:
+`groupStatements` keys on **(account, calendar month)** and dates each statement
+at the account's `dueDay` clamped into that month, never at an occurrence's own
+day. Anchor drift becomes invisible rather than impossible, and one account can
+emit at most one statement per month regardless of what its purchases carry.
+Dating the statement from the account also puts every paid-marker for it on the
+same day, which is what lets the due-day marker shift (case 4) land exactly.
+
+The deeper fix — store only the first _month_ and derive the day at read time —
+would make drift unrepresentable and remove `bnpl.update`'s fan-out entirely.
+Deferred: it changes the stored shape, and month-grouping already holds the
+invariant.
+
+## Scheduling and money math
+
+Because purchases live in `bills`, `computeBillsInPeriod` already generates
+their occurrences on the shared due date and they are already inside the period
+sums. "Counted but not listed" therefore needs **no new money plumbing** — only
+a partition at render time.
+
+```ts
+// src/lib/bill-utils.ts
+partitionBills<T extends { bnplAccountId?: string | null }>(
+  rows: T[],
+): { bills: T[]; installments: T[] }
+```
+
+Generic over the element type because two shapes need it: raw `BillEvent`s (the
+summary cards) and generated occurrence rows (`BillEvent & { date: Date }`, the
+bill list). One helper, destructured by every consumer rather than filtered ad
+hoc. A polymorphic collection rots when the filter is spelled out at each call
+site; this is the single narrow seam that prevents that.
+
+### `billList.tsx`
+
+`bills` feed the existing group sections. `installments` group by
+**(accountId, dueDate)** and render as one non-expandable roll-up row per
+account with a statement in that period:
+
+```
+Sep 15 – Sep 29                     +₱1,300
+₱18,000 coming in, ₱16,700 going out
+
+  Utilities (2)                       ₱3,500
+    Meralco              Sep 20       ₱2,800
+    Water                Sep 22         ₱700
+
+  Ungrouped (2)                       ₱9,000
+    Rent                 Sep 15       ₱8,000
+    Netflix              Sep 18       ₱1,000
+
+  SPayLater (3)          Sep 15       ₱4,200
+  LazPayLater (1)        Sep 20         ₱900
+```
+
+This preserves the invariant the file documents today — _the sum of section
+subtotals equals the card's outgoing total_ — which would otherwise break the
+moment a counted amount stopped being itemized. The statement amount is derived
+from that month's active purchases, so it varies correctly as purchases finish.
+
+Consolidation means a given account contributes at most one statement date per
+month, so a fortnightly pay period holds zero or one roll-up row per account.
+
+### `financialSummaryCards.tsx`
+
+- **Total Bills** — each account's statement counts as **1**, not N purchases.
+- **Remaining** — includes each statement's **unpaid purchases**, not the whole
+  statement amount. A statement settled at ₱3,000 that then gains a ₱500
+  purchase (or a tenure increase) owes ₱500, not ₱3,500.
+- **Next Bill** — a statement competes with ordinary bills on date; when one
+  wins, the card shows the account name and the statement amount.
+
+### Paid state
+
+Paid is per **(account, statement date)**, not per purchase: you settle one
+statement, so one toggle. Accounts settle independently. The markers are still
+per purchase underneath, so a statement that gains a purchase after settlement
+reads unpaid again and owes only the new amount.
+
+New bulk procedures take an account id and a statement date and write (or
+delete) a `payments` document for each of that account's purchases due then:
+
+- `payment.markStatementPaid`
+- `payment.markStatementUnpaid`
+
+Both validate that the account belongs to the requesting user before writing,
+mirroring `assertBillOwned` in the existing payment router. Bulk on the server
+rather than N mutations from the client. A statement reads as paid when every
+purchase due that date has a payment, which also yields exact per-purchase
+progress on the page for free.
+
+**Known behaviour:** adding a purchase to a month already marked paid makes that
+statement read unpaid again. This is intended — more is genuinely owed — but it
+is a decision, not an accident.
+
+## Pages and components
+
+Mirrors the Groups pattern (thin RSC page delegating to one client component),
+split up front because `groupManager.tsx` is already 400+ lines.
+
+| File                                        | Responsibility                                        |
+| ------------------------------------------- | ----------------------------------------------------- |
+| `src/app/bnpl/page.tsx`                     | RSC shell, `force-dynamic`, renders `<BnplManager />` |
+| `src/components/bnplManager.tsx`            | Account list, empty state, orchestration              |
+| `src/components/bnplAccountCard.tsx`        | One account: header, current statement, its purchases |
+| `src/components/bnplAccountFormDialog.tsx`  | Create/edit account (name, due day)                   |
+| `src/components/bnplPurchaseFormDialog.tsx` | Create/edit purchase                                  |
+| `src/server/api/routers/bnpl.ts`            | Account CRUD + purchase mutations                     |
+| `src/schemas/bnpl.ts`                       | Zod inputs, mirroring `schemas/group.ts`              |
+
+Route `/bnpl`; nav label **BNPL**, between Groups and Playground. No identifier
+in the codebase names a specific provider — issue #44 is satisfied by SPayLater
+being the first account the user creates.
+
+An account card shows: name, `Due the 15th`, the committed total, the current
+statement with its paid toggle, then its purchases with monthly amount and
+`3 of 6` progress.
+
+Two terms used above, defined once here:
+
+- **Current statement** — the account's earliest statement from the start of the
+  current month onward, and the purchases with an installment falling on it. The
+  window opens at the month start, not at today, so a statement whose due date
+  has passed unpaid stays on the card and settleable — `/bnpl` holds the only
+  statement toggle in the app, so dropping it there would strand it.
+- **Committed total** — the sum of `amount` across the purchases in the current
+  statement. It is the statement's amount, and it shrinks as purchases finish.
+
+The purchase form collects **title, monthly amount, tenure in months, and first
+due month**. It never collects a day — that comes from the account.
+
+Purchase mutations live in `bnplRouter`, **not** `billRouter`, even though they
+write to `bills`. `bill.create` accepts a raw recurrence; a purchase must have
+its `dtstart` derived. Keeping `billRouter`'s contract unchanged means it cannot
+mint a BNPL item by accident.
+
+Account ownership is validated on every write, following the existing
+`resolveGroupId` pattern in `bill.ts`.
+
+### Types
+
+`src/types/index.ts` gains `BnplAccount`, and `BillEvent` gains
+`bnplAccountId?: string | null`.
+
+## Edge cases
+
+### 1. Changing an account's due day rewrites its purchases
+
+Say a SPayLater account has `dueDay: 15` and three purchases, each stored with
+`dtstart` on the 15th. The due day then changes to 20 — the provider moved the
+cycle, or the original value was a typo.
+
+Updating only the account document leaves the three existing purchases
+generating occurrences on the 15th while new ones generate on the 20th. The
+dashboard would then show **two** SPayLater rows in the same month. That is the
+split statement the derivation exists to prevent, so the mutation that changes
+`dueDay` must also rewrite `dtstart` on every purchase belonging to that
+account.
+
+Because that rewrite silently moves the due date on purchases entered months
+ago, it is **confirmed first**. Saving a changed due day opens a dialog naming
+how many purchases will move and which day they move from and to; the rewrite
+runs only on confirmation. Changing an account's name alone never prompts.
+
+**The rewrite must also move the paid-markers.** Markers are keyed on
+`(billId, occurrenceDate)` (see case 4), and moving `dtstart` moves every
+occurrence date they point at. Left alone, every paid installment on the account
+would revert to reading unpaid, and the stale rows could never be cleared —
+`markUnpaid` needs the occurrence rendered before anyone can click it, which is
+the same unclearable state case 4 exists to prevent, arriving through the update
+path instead of the delete path.
+
+So the same mutation shifts each marker by the same transform it applied to
+`dtstart`: month kept, day replaced, clamped backward. This preserves paid
+history exactly, and it cannot collide — a bill produces at most one occurrence
+per month, so two markers for one bill always differ in month, and a transform
+that preserves the month keeps them distinct.
+
+### 2. Deleting an account asks what to do with its purchases
+
+The confirmation dialog names the purchase count and offers two outcomes:
+
+- **Delete purchases too** — the account, its purchases, and their paid-markers
+  are all removed, via the shared cascade helper (see case 4).
+- **Keep as ordinary bills** — `bnplAccountId` is unset. The purchases survive
+  as plain monthly recurring bills and begin appearing as individual rows in the
+  pay-period list. Their `count` still ends them at the close of their tenure,
+  and their paid-markers stay valid because the bill ids never change — so this
+  path deliberately does **not** touch `payments`.
+
+Neither outcome dominates, which is why both are offered instead of one being
+chosen here. Cascading destroys real purchase and payment history. Unsetting
+destroys nothing and merely costs tidiness — the bill list gets those rows back.
+That trade belongs to the person doing the deleting, at the moment they do it.
+
+### 3. Due days 29–31 clamp to month end
+
+`dueDay` may be 31, but not every month has a 31st. With `dueDay: 31` and
+February as the first month, there is no Feb 31 to store. Rolling forward to
+Mar 3 would place the statement in the wrong month and skip February entirely,
+so derivation clamps backward instead: Feb 28, or Feb 29 in a leap year.
+
+`monthlyOccurrencesInPeriod` already clamps the occurrences it generates. What
+needs attention is that the **first** date — `dtstart` itself — is computed with
+the same clamping, rather than assuming the generator will cover it.
+
+### 4. Deleting a single purchase also deletes its paid-markers
+
+Background: marking something paid does not modify the bill. It writes a tiny
+separate document into the `payments` collection that says, in effect, _"bill X,
+the occurrence on date Y, is settled."_ It holds no amount — just that pairing.
+Paid state is the presence of such a marker; unpaid is its absence.
+
+That means deleting a bill without deleting its markers leaves rows pointing at
+a bill that no longer exists. Nothing can render them, and nothing can clear
+them; they simply accumulate. `bill.delete` already avoids this by removing both
+together.
+
+A purchase is a bill, so it needs the same cleanup. But purchase deletion lives
+in `bnplRouter` — deliberately, so `billRouter` can never create or manage a
+BNPL item — which means `bnplRouter` does not get `bill.delete`'s cleanup for
+free.
+
+Writing the same two-step delete in both routers would mean one rule living in
+two places, correct only as long as both are remembered. Instead it is extracted
+into a **shared helper** that both routers call.
+
+### 5. Every screen that reads the bill list is accounted for
+
+Purchases are stored in the same `bills` collection as ordinary bills, so the
+single query the whole app uses to fetch bills — `bill.getAll` — returns both
+kinds mixed together. Any screen that takes that result and assumes every row is
+an ordinary bill will render purchases as individual rows, which is exactly the
+clutter this feature exists to remove.
+
+`partitionBills` is the fix, but it only helps where it is actually called. So
+every consumer of `bill.getAll` was checked, and the result is below rather than
+left as "remember to look during implementation". Two of them correctly need no
+change, for opposite reasons:
+
+| Consumer                                      | Action                                                                                                 |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `billList.tsx:354`                            | **Partition** — group rows vs roll-up row                                                              |
+| `financialSummaryCards.tsx`                   | **Partition** — a statement counts as 1                                                                |
+| `playgroundStartScreen.tsx:31`                | **Partition** — "clone my bills" would otherwise drag purchases into the playground as loose bills     |
+| `dashboardPage.tsx:133`                       | **No change, deliberately** — `hasBills` must count purchases, or a BNPL-only user sees "No bills yet" |
+| `groupManager.tsx:232`                        | **No change** — already filters on `groupId`, which purchases never carry                              |
+| `billModal`, `billViewMode`, `createBillForm` | **No change** — invalidation only; roll-up rows are not clickable                                      |
+
+`playgroundStartScreen` is the subtle one: a purchase clones perfectly into the
+playground _because_ it is a structurally valid recurring bill, reappearing as
+individual rows in the one surface declared out of scope.
+
+### 6. Editing a purchase can strand its paid-markers too
+
+Case 1 covers the due-day path, where the _day_ moves and markers shift with it.
+Editing a purchase moves things case 1's reasoning does not cover, and the same
+harm follows:
+
+- **Changing the first month** moves every occurrence to a different month. The
+  markers cannot be shifted the way a day-change shifts them, because
+  installment 1 is now a different month — shifting would silently re-attribute
+  a payment made for March to the new installment 1. So the bill's markers are
+  **deleted**: the schedule was redefined, and prior paid records no longer
+  correspond to anything the user can see.
+- **Shrinking the tenure** leaves markers past the new final occurrence with
+  nothing to render them. Those, and only those, are deleted; markers for
+  installments that still exist stay valid.
+
+Without this, a purchase edited forward by a month shows its current statement
+as paid when it is not, and `Remaining` under-counts by that installment — a
+wrong number, not merely an orphaned row.
+
+This case was missed in the first draft of this spec and found by the
+whole-branch review. Note the pre-existing `bill.update` orphans markers the
+same way for ordinary recurring bills; that is out of scope here, but it is the
+same defect class.
+
+### 7. Lesser cases
+
+- A fully-elapsed purchase stops generating occurrences via `count`; it sorts
+  last on the account card with a "Done" badge.
+- An account with no purchases shows ₱0 committed and produces no roll-up row.
+
+## Verification
+
+The repo has no test framework. This feature introduces **Vitest** covering only
+the pure helpers — the logic where manual clicking verifies worst:
+
+- `dtstart` derivation, including month-end clamping (Feb + day 31, Apr + day
+  31, day 28 in every month).
+- `partitionBills`.
+- Statement grouping by (account, date).
+
+Adds `vitest` as a dev dependency, a config file, and a `test` script. UI is
+verified by driving the running app (the project's `verify` skill).
+
+Note: `pnpm check` and `pnpm lint` are unreliable under Next 16 (`next lint` is
+removed) — run `tsc --noEmit` and `eslint` directly.
+
+## Future direction
+
+The non-goals fit this model without rework. Interest, purchase price, and
+credit limits are all **account-level or purchase-level attributes**, so they
+accumulate on `bnpl_accounts` documents or on the purchase input without the
+bill schema learning about them, and without disturbing the money-math wiring
+established here.

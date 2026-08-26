@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
+import { partitionBills } from "~/lib/bill-utils";
 import { api } from "~/trpc/react";
 import { usePlaygroundDispatch } from "./playgroundContext";
 import type { IncomeProfile } from "~/types";
@@ -28,7 +29,8 @@ export function PlaygroundStartScreen({
   };
 
   const handleCloneBills = () => {
-    dispatch({ type: "INIT_CLONE", incomeProfile, bills: bills ?? [] });
+    const { bills: ordinaryBills } = partitionBills(bills ?? []);
+    dispatch({ type: "INIT_CLONE", incomeProfile, bills: ordinaryBills });
   };
 
   return (
