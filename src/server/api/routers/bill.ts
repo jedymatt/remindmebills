@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { ObjectId, type WithoutId } from "mongodb";
+import { ObjectId, type Db, type WithoutId } from "mongodb";
 import type { Simplify } from "type-fest";
 import { z } from "zod";
 import { RecurringBillSchema, SingleBillSchema } from "~/schemas/bill";
@@ -57,7 +57,7 @@ type GroupDoc = {
 // Resolves a groupId string from input into an ObjectId after checking the
 // group belongs to the requesting user. Returns null if input is null/empty.
 async function resolveGroupId(
-  ctx: { db: import("mongodb").Db; session: { user: { id: string } } },
+  ctx: { db: Db; session: { user: { id: string } } },
   rawGroupId: string | null | undefined,
 ): Promise<ObjectId | null> {
   if (rawGroupId == null || rawGroupId === "") return null;
