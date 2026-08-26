@@ -62,11 +62,16 @@ async function assertPurchasesInAccount(
 ): Promise<{ billOids: ObjectId[]; userOid: ObjectId }> {
   const { accountOid, userOid } = await assertAccountOwned(ctx, accountId);
 
-  if (billIds.some((id) => !ObjectId.isValid(id))) {
+  // Dedupe before counting: a repeated id would otherwise make countDocuments'
+  // distinct-document match fall short of the raw input length and reject a
+  // valid request. The deduped list is also what gets queried and written.
+  const uniqueIds = [...new Set(billIds)];
+
+  if (uniqueIds.some((id) => !ObjectId.isValid(id))) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Purchase not found" });
   }
 
-  const billOids = billIds.map((id) => new ObjectId(id));
+  const billOids = uniqueIds.map((id) => new ObjectId(id));
   const matched = await ctx.db.collection("bills").countDocuments({
     _id: { $in: billOids },
     userId: userOid,
