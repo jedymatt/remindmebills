@@ -969,6 +969,44 @@ export const bnplRouter = createTRPCRouter({
       if (ops.length > 0) {
         await ctx.db.collection("bills").bulkWrite(ops);
       }
+
+      // Paid-markers are keyed on (billId, occurrenceDate), so moving dtstart
+      // moves the occurrences they point at. Left alone, every paid installment
+      // would revert to unpaid and the stale rows could never be cleared —
+      // markUnpaid needs the occurrence rendered before it can be clicked.
+      // Shift them by the same transform: month kept, day replaced. A bill has
+      // at most one occurrence per month, so two markers for one bill always
+      // differ in month and cannot collide on the new date.
+      const billOids = purchases.map((p) => p._id);
+      if (billOids.length > 0) {
+        const markerCursor = ctx.db
+          .collection<{
+            _id: ObjectId;
+            billId: ObjectId;
+            occurrenceDate: Date;
+          }>("payments")
+          .find({ userId: userOid, billId: { $in: billOids } });
+        const markers = await markerCursor.toArray();
+        await markerCursor.close();
+
+        const markerOps = markers.map((marker) => ({
+          updateOne: {
+            filter: { _id: marker._id, userId: userOid },
+            update: {
+              $set: {
+                occurrenceDate: deriveStatementDtstart(
+                  nextDueDay,
+                  marker.occurrenceDate,
+                ),
+              },
+            },
+          },
+        }));
+
+        if (markerOps.length > 0) {
+          await ctx.db.collection("payments").bulkWrite(markerOps);
+        }
+      }
     }),
 
   delete: protectedProcedure
@@ -1291,11 +1329,17 @@ async function assertPurchasesInAccount(
 ): Promise<{ billOids: ObjectId[]; userOid: ObjectId }> {
   const { accountOid, userOid } = await assertAccountOwned(ctx, accountId);
 
-  if (billIds.some((id) => !ObjectId.isValid(id))) {
+  // Dedupe before counting: `countDocuments` counts distinct documents, so a
+  // repeated id would make `matched` fall short of the raw input length and
+  // reject a request whose every id is validly owned. The deduped set is also
+  // what the callers write from, so bulkWrite emits no redundant ops.
+  const uniqueIds = [...new Set(billIds)];
+
+  if (uniqueIds.some((id) => !ObjectId.isValid(id))) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Purchase not found" });
   }
 
-  const billOids = billIds.map((id) => new ObjectId(id));
+  const billOids = uniqueIds.map((id) => new ObjectId(id));
   const matched = await ctx.db.collection("bills").countDocuments({
     _id: { $in: billOids },
     userId: userOid,
@@ -2622,8 +2666,12 @@ In `BillListCard`, accept `accounts: BnplAccount[]` in its props, then split the
 `outgoing` must keep summing **all** rows — installments included — so the balance stays an honest projection:
 
 ```tsx
-  // Installments are counted here but itemized as one roll-up row per account
-  // below, so section subtotals plus statement amounts still equal `outgoing`.
+  // Two things deliberately stay in this sum. Paid occurrences, because the card
+  // balance is a stable income-minus-all-bills projection rather than "cash
+  // left" — paid shows as a struck row, and remaining-to-pay lives in the
+  // summary cards. And installments, because they are itemized as one roll-up
+  // row per account below, so section subtotals plus statement amounts still
+  // equal `outgoing`.
   const outgoing = useMemo(
     () =>
       sumBy(
@@ -2734,10 +2782,10 @@ Rework the `useMemo` so "Total Bills" and "Next Bill" treat a statement as one i
   const { remaining, nextItem, billCount } = useMemo(() => {
     const payRule = createPayRule(incomeProfile);
     const currentPay = payRule.before(localDateToUtcDateOnly(new Date()), true);
-    if (!currentPay) return { remaining: 0, nextItem: null, billCount: 0 };
+    if (!currentPay) return { remaining: 0, nextItem: null };
 
     const nextPayDate = payRule.after(currentPay);
-    if (!nextPayDate) return { remaining: 0, nextItem: null, billCount: 0 };
+    if (!nextPayDate) return { remaining: 0, nextItem: null };
 
     const periodRows = computeBillsInPeriod(bills, currentPay, nextPayDate);
     const { bills: ordinaryRows, installments } = partitionBills(periodRows);
@@ -2752,14 +2800,6 @@ Rework the `useMemo` so "Total Bills" and "Next Bill" treat a statement as one i
       s.billIds.every((id) => isOccurrencePaid(paidKeys, id, s.date))
         ? 0
         : s.amount,
-    );
-
-    // "Total Bills" counts a statement as one obligation, not N purchases —
-    // one payment is what the user actually makes.
-    const { bills: ordinaryAll, installments: installmentsAll } =
-      partitionBills(bills);
-    const accountsWithPurchases = new Set(
-      installmentsAll.map((b) => b.bnplAccountId),
     );
 
     // Nearest upcoming unpaid obligation of either kind.
@@ -2788,9 +2828,21 @@ Rework the `useMemo` so "Total Bills" and "Next Bill" treat a statement as one i
     return {
       remaining: remainingBills + remainingStatements,
       nextItem: candidates[0] ?? null,
-      billCount: ordinaryAll.length + accountsWithPurchases.size,
     };
   }, [incomeProfile, bills, paidKeys, accounts]);
+
+  // Counted independently of the pay period. A statement is one obligation
+  // whenever it falls, and this card has always been whole-list ("Active
+  // bills"). Deriving it inside the period memo above would make it read 0
+  // whenever no current pay period resolves — e.g. a profile whose start date
+  // is still in the future, which is exactly a new user's first days.
+  const billCount = useMemo(() => {
+    const { bills: ordinaryAll, installments } = partitionBills(bills);
+    const accountsWithPurchases = new Set(
+      installments.map((b) => b.bnplAccountId),
+    );
+    return ordinaryAll.length + accountsWithPurchases.size;
+  }, [bills]);
 ```
 
 Update the two affected cards:
@@ -2871,4 +2923,5 @@ git commit -m "feat: count BNPL statements in summary cards, exclude from playgr
 - Section subtotals plus roll-up amounts equal each period card's outgoing total.
 - Changing an account's due day moves every existing purchase, leaving exactly one statement per month.
 - Deleting an account offers both outcomes: "delete purchases too" removes them and their paid-markers; "keep as ordinary bills" leaves them in the bill list with their paid history intact.
+- Changing an account's due day preserves paid state: markers move with their occurrences rather than being stranded on dates nothing renders.
 - No file in `src/` contains the string "Shopee" or "SPayLater" outside of placeholder/example copy.

@@ -239,6 +239,20 @@ ago, it is **confirmed first**. Saving a changed due day opens a dialog naming
 how many purchases will move and which day they move from and to; the rewrite
 runs only on confirmation. Changing an account's name alone never prompts.
 
+**The rewrite must also move the paid-markers.** Markers are keyed on
+`(billId, occurrenceDate)` (see case 4), and moving `dtstart` moves every
+occurrence date they point at. Left alone, every paid installment on the account
+would revert to reading unpaid, and the stale rows could never be cleared —
+`markUnpaid` needs the occurrence rendered before anyone can click it, which is
+the same unclearable state case 4 exists to prevent, arriving through the update
+path instead of the delete path.
+
+So the same mutation shifts each marker by the same transform it applied to
+`dtstart`: month kept, day replaced, clamped backward. This preserves paid
+history exactly, and it cannot collide — a bill produces at most one occurrence
+per month, so two markers for one bill always differ in month, and a transform
+that preserves the month keeps them distinct.
+
 ### 2. Deleting an account asks what to do with its purchases
 
 The confirmation dialog names the purchase count and offers two outcomes:
@@ -314,7 +328,32 @@ change, for opposite reasons:
 playground *because* it is a structurally valid recurring bill, reappearing as
 individual rows in the one surface declared out of scope.
 
-### 6. Lesser cases
+### 6. Editing a purchase can strand its paid-markers too
+
+Case 1 covers the due-day path, where the *day* moves and markers shift with it.
+Editing a purchase moves things case 1's reasoning does not cover, and the same
+harm follows:
+
+- **Changing the first month** moves every occurrence to a different month. The
+  markers cannot be shifted the way a day-change shifts them, because
+  installment 1 is now a different month — shifting would silently re-attribute
+  a payment made for March to the new installment 1. So the bill's markers are
+  **deleted**: the schedule was redefined, and prior paid records no longer
+  correspond to anything the user can see.
+- **Shrinking the tenure** leaves markers past the new final occurrence with
+  nothing to render them. Those, and only those, are deleted; markers for
+  installments that still exist stay valid.
+
+Without this, a purchase edited forward by a month shows its current statement
+as paid when it is not, and `Remaining` under-counts by that installment — a
+wrong number, not merely an orphaned row.
+
+This case was missed in the first draft of this spec and found by the
+whole-branch review. Note the pre-existing `bill.update` orphans markers the
+same way for ordinary recurring bills; that is out of scope here, but it is the
+same defect class.
+
+### 7. Lesser cases
 
 - A fully-elapsed purchase stops generating occurrences via `count`; it sorts
   last on the account card with a "Done" badge.
