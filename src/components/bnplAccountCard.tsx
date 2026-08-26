@@ -2,7 +2,7 @@
 
 import { Circle, CircleCheckBig, Pencil, Plus, Trash2 } from "lucide-react";
 import { installmentProgress, type Statement } from "~/lib/bnpl-utils";
-import { formatUtcDate } from "~/lib/date-utils";
+import { formatUtcDate, localDateToUtcDateOnly } from "~/lib/date-utils";
 import { cn } from "~/lib/utils";
 import type { BillEvent, BnplAccount } from "~/types";
 import { Button } from "./ui/button";
@@ -117,7 +117,7 @@ export function BnplAccountCard({
             const { elapsed, total } = installmentProgress(
               purchase.recurrence.dtstart,
               purchase.recurrence.count,
-              statement?.date ?? new Date(),
+              statement?.date ?? localDateToUtcDateOnly(new Date()),
             );
             const isDone = elapsed >= total;
 

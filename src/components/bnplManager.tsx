@@ -203,6 +203,21 @@ export function BnplManager() {
     onError: (e) => toast.error(e.message || "Failed to delete purchase"),
   });
 
+  // Memoized so identity is stable across unrelated re-renders (a react-query
+  // refetch, a sibling mutation's pending flip) — otherwise a new object every
+  // render would fire the dialog's reset effect and discard an in-progress
+  // edit. Keyed on the purchase being edited, plus the fields it reads.
+  const purchaseInitialValues = useMemo<PurchaseFormValues | undefined>(() => {
+    const purchase = purchaseTarget?.purchase;
+    if (purchase?.type !== "recurring") return undefined;
+    return {
+      title: purchase.title,
+      amount: purchase.amount ?? 0,
+      tenureMonths: purchase.recurrence.count ?? 1,
+      firstDueMonth: purchase.recurrence.dtstart,
+    };
+  }, [purchaseTarget?.purchase]);
+
   const markStatementPaid = api.payment.markStatementPaid.useMutation();
   const markStatementUnpaid = api.payment.markStatementUnpaid.useMutation();
 
@@ -387,7 +402,7 @@ export function BnplManager() {
               Keep purchases as ordinary bills
             </AlertDialogAction>
             <AlertDialogAction
-              className="w-full"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 w-full"
               onClick={(e) => {
                 e.preventDefault();
                 if (deleting)
@@ -416,16 +431,7 @@ export function BnplManager() {
         open={purchaseTarget !== null}
         onOpenChange={(open) => !open && setPurchaseTarget(null)}
         accountName={purchaseTarget?.account.name ?? ""}
-        initialValues={
-          purchaseTarget?.purchase?.type === "recurring"
-            ? {
-                title: purchaseTarget.purchase.title,
-                amount: purchaseTarget.purchase.amount ?? 0,
-                tenureMonths: purchaseTarget.purchase.recurrence.count ?? 1,
-                firstDueMonth: purchaseTarget.purchase.recurrence.dtstart,
-              }
-            : undefined
-        }
+        initialValues={purchaseInitialValues}
         onSubmit={(values: PurchaseFormValues) => {
           if (!purchaseTarget) return;
           if (purchaseTarget.purchase) {

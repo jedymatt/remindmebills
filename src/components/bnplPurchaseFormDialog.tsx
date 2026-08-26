@@ -42,6 +42,19 @@ function monthInputToUtc(value: string): Date | undefined {
   return isNaN(parsed.getTime()) ? undefined : parsed;
 }
 
+// Shared by useForm's initial state and the create-mode reset below, so the
+// two can't drift apart into two different "empty purchase" shapes.
+function defaultPurchaseFormValues(): PurchaseFormValues {
+  return {
+    title: "",
+    amount: 0,
+    tenureMonths: 6,
+    firstDueMonth: new Date(
+      Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1),
+    ),
+  };
+}
+
 export function BnplPurchaseFormDialog({
   open,
   onOpenChange,
@@ -59,19 +72,15 @@ export function BnplPurchaseFormDialog({
 }) {
   const form = useForm<PurchaseFormValues>({
     resolver: zodResolver(PurchaseFormSchema),
-    defaultValues: {
-      title: "",
-      amount: 0,
-      tenureMonths: 6,
-      firstDueMonth: new Date(
-        Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1),
-      ),
-    },
+    defaultValues: defaultPurchaseFormValues(),
   });
 
+  // Reset on open so an edit shows the current values and a create starts
+  // clean — otherwise one dialog instance serving both modes leaves a create
+  // holding whatever an earlier edit last had in it.
   useEffect(() => {
     if (!open) return;
-    if (initialValues) form.reset(initialValues);
+    form.reset(initialValues ?? defaultPurchaseFormValues());
   }, [open, initialValues, form]);
 
   return (
