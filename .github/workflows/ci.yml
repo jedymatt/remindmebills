@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Superseded PR runs are abandoned; pushes to main always finish, so the default
+# branch's status is never left ambiguous.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: ${{ matrix.task }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      # Each gate reports its own verdict. `pnpm check` chains these with `&&`,
+      # which is right for a local pre-commit signal — stop at the first problem
+      # — but wrong here: a type error would mask whether lint and tests also
+      # fail, so a push would only ever reveal one problem per run.
+      fail-fast: false
+      matrix:
+        task: [typecheck, lint, test]
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # Reads the pnpm version from `packageManager` in package.json, so it is
+      # pinned in exactly one place. Must precede setup-node, whose pnpm cache
+      # needs pnpm on PATH to locate the store.
+      - uses: pnpm/action-setup@v6
+
+      # `cache: pnpm` is stated explicitly even though setup-node v5+ would
+      # enable it automatically from the `packageManager` field — implicit
+      # caching is easy to miss when debugging a slow or stale run.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # No secrets and no prior `next build`: all three tasks were verified to
+      # pass with an empty environment and without `.next`/`next-env.d.ts`,
+      # both of which are gitignored and therefore absent on a fresh checkout.
+      - run: pnpm ${{ matrix.task }}
