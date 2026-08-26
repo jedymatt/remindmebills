@@ -13,6 +13,11 @@ import type { Db, ObjectId } from "mongodb";
  * but their mutations live in the BNPL router, so without this helper the same
  * rule would be written twice and remembered once.
  *
+ * Markers are deleted before bills, not after: if the bills delete were to
+ * throw partway, deleting markers first leaves a benign state (occurrences
+ * simply show unpaid and can be re-marked) rather than the orphaned-marker
+ * state this function exists to avoid.
+ *
  * Returns the number of bills actually deleted, so callers can distinguish
  * "not found" from "deleted".
  */
@@ -23,13 +28,13 @@ export async function deleteBillsWithPayments(
 ): Promise<number> {
   if (billOids.length === 0) return 0;
 
-  const result = await db
-    .collection("bills")
-    .deleteMany({ _id: { $in: billOids }, userId: userOid });
-
   await db
     .collection("payments")
     .deleteMany({ userId: userOid, billId: { $in: billOids } });
+
+  const result = await db
+    .collection("bills")
+    .deleteMany({ _id: { $in: billOids }, userId: userOid });
 
   return result.deletedCount;
 }

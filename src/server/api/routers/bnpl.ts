@@ -19,15 +19,20 @@ export type BnplAccountDoc = {
 };
 
 // Minimal shape of a purchase document this router reads back when rewriting
-// schedules. Purchases are `bills` rows; see the bill router for the full type.
+// schedules or resolving which bills belong to an account. Purchases are
+// `bills` rows; see the bill router for the full type. `bnplAccountId` is
+// typed here (rather than left to an untyped filter) so a typo in the field
+// name fails the compiler instead of silently matching zero documents — every
+// purchase query in this router filters on it.
 type PurchaseDoc = {
   _id: ObjectId;
+  bnplAccountId?: ObjectId;
   recurrence?: { dtstart?: Date };
 };
 
 /**
  * Confirms the account exists and belongs to the requesting user. Mirrors
- * `resolveGroupId` in the bill router. Returns the resolved ids so callers
+ * `assertBillOwned` in the payment router. Returns the resolved ids so callers
  * don't re-parse them.
  */
 export async function assertAccountOwned(
@@ -156,6 +161,44 @@ export const bnplRouter = createTRPCRouter({
       if (ops.length > 0) {
         await ctx.db.collection("bills").bulkWrite(ops);
       }
+
+      // Paid-markers are keyed on (billId, occurrenceDate), so moving dtstart
+      // moves the occurrences they point at. Left alone, every paid installment
+      // would revert to unpaid and the stale rows could never be cleared —
+      // markUnpaid needs the occurrence rendered before it can be clicked.
+      // Shift them by the same transform that moved dtstart: month kept, day
+      // replaced. A bill has at most one occurrence per month, so two markers
+      // for one bill always differ in month and can never collide on the new date.
+      const billOids = purchases.map((purchase) => purchase._id);
+      if (billOids.length > 0) {
+        const markerCursor = ctx.db
+          .collection<{
+            _id: ObjectId;
+            billId: ObjectId;
+            occurrenceDate: Date;
+          }>("payments")
+          .find({ userId: userOid, billId: { $in: billOids } });
+        const markers = await markerCursor.toArray();
+        await markerCursor.close();
+
+        const markerOps = markers.map((marker) => ({
+          updateOne: {
+            filter: { _id: marker._id, userId: userOid },
+            update: {
+              $set: {
+                occurrenceDate: deriveStatementDtstart(
+                  nextDueDay,
+                  marker.occurrenceDate,
+                ),
+              },
+            },
+          },
+        }));
+
+        if (markerOps.length > 0) {
+          await ctx.db.collection("payments").bulkWrite(markerOps);
+        }
+      }
     }),
 
   delete: protectedProcedure
@@ -165,7 +208,7 @@ export const bnplRouter = createTRPCRouter({
 
       if (input.purchases === "delete") {
         const cursor = ctx.db
-          .collection<{ _id: ObjectId }>("bills")
+          .collection<PurchaseDoc>("bills")
           .find(
             { userId: userOid, bnplAccountId: accountOid },
             { projection: { _id: 1 } },
