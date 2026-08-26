@@ -28,8 +28,11 @@ pnpm test:watch       # Vitest watch mode
 Vitest covers pure helpers only — there is no harness for tRPC routers or
 components, so router logic is verified by review and by hand (tracked in #47).
 
-`pnpm check` runs the three gates in order — `tsc --noEmit && eslint . && vitest
-run` — so the fastest decisive signal comes first. Note that Next 16 removed
+`pnpm check` runs the three gates in order — `pnpm typecheck && pnpm lint &&
+pnpm test` — so the fastest decisive signal comes first. It delegates to those
+three scripts rather than inlining the tools because CI runs the same three as
+separate parallel jobs; sharing one definition per gate keeps them from
+drifting. Lint is ratcheted at `--max-warnings 0`. Note that Next 16 removed
 `next lint`, so ESLint is invoked directly; `eslint-config-next` must stay in
 lockstep with `next`, and its flat config is consumed via its native
 `eslint-config-next/core-web-vitals` entrypoint (no `FlatCompat` shim).
