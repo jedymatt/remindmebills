@@ -31,11 +31,7 @@ export function deriveStatementDtstart(
   dueDay: number,
   firstDueMonth: Date,
 ): Date {
-  return utcDateInMonth(
-    firstDueMonth.getUTCFullYear(),
-    firstDueMonth.getUTCMonth(),
-    dueDay,
-  );
+  return utcDateInMonth(firstDueMonth, dueDay);
 }
 
 /** Shown when an installment references an account that no longer exists. */

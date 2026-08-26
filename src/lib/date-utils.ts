@@ -1,4 +1,11 @@
-import { format } from "date-fns";
+import { UTCDate } from "@date-fns/utc";
+import {
+  addMonths,
+  format,
+  getDaysInMonth,
+  setDate,
+  startOfMonth,
+} from "date-fns";
 
 /**
  * Date-only values in this app (bill `date`/`dtstart`/`until`, income
@@ -53,14 +60,39 @@ export function truncateToUtcDateOnly(date: Date): Date {
 
 /** Format a canonical (UTC-midnight) value by its calendar day, timezone-stably. */
 export function formatUtcDate(date: Date, formatStr: string): string {
-  return format(utcDateOnlyToLocal(date), formatStr);
+  return format(new UTCDate(date), formatStr);
 }
 
 /**
- * Canonical UTC-midnight date for `day` of the given UTC month (`month` is
- * 0-indexed), clamped *backward* when that day doesn't exist there: day 31 in
- * February yields Feb 28, or Feb 29 in a leap year. Rolling forward instead
- * would push the date into the next month and skip the intended one.
+ * Run a date-fns calculation in UTC and return a plain canonical `Date`.
+ *
+ * `UTCDate` carries its frame in the *value*, not in a per-call option: date-fns
+ * rebuilds results via `Symbol.for("constructDateFrom")`, so every function in a
+ * chain keeps reading and writing UTC fields. There is no `{ in: … }` to pass at
+ * each call site and therefore none to forget — the frame is structural, which
+ * is what lets these helpers delegate to date-fns instead of hand-rolling
+ * `Date.UTC` arithmetic.
+ *
+ * Measured in `Pacific/Midway` (−11) for `2026-01-31T00:00:00Z`:
+ * `startOfMonth(plainDate)` answers `2026-01-01T11:00:00Z` — the wrong day —
+ * while `startOfMonth(new UTCDate(d))` answers `2026-01-01T00:00:00Z`.
+ *
+ * The result is unwrapped to a plain `Date` because these values are written to
+ * MongoDB and cross SuperJSON. `UTCDate` is a `Date` subclass, so it would very
+ * likely survive both, but keeping the subclass out of the storage path costs
+ * one `getTime()` and removes the question.
+ */
+function inUtcFrame(date: Date, calculate: (utc: UTCDate) => Date): Date {
+  return new Date(calculate(new UTCDate(date)).getTime());
+}
+
+/**
+ * Canonical UTC-midnight date for `day` of the UTC month `monthOf` falls in,
+ * clamped *backward* when that day doesn't exist there: day 31 in February
+ * yields Feb 28, or Feb 29 in a leap year. Rolling forward instead would push
+ * the date into the next month and skip the intended one — which is why the day
+ * is pre-clamped rather than handed to `setDate`, whose native overflow rolls
+ * forward.
  *
  * This is the single spelling of "which day of this month" shared by the monthly
  * occurrence generator (`monthlyOccurrencesInPeriod`) and BNPL statement
@@ -69,21 +101,24 @@ export function formatUtcDate(date: Date, formatStr: string): string {
  * day from installments 2..N and its account would split into two statements a
  * month.
  */
-export function utcDateInMonth(year: number, month: number, day: number): Date {
-  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-  return new Date(Date.UTC(year, month, Math.min(day, lastDay)));
+export function utcDateInMonth(monthOf: Date, day: number): Date {
+  return inUtcFrame(monthOf, (utc) =>
+    setDate(utc, Math.min(day, getDaysInMonth(utc))),
+  );
 }
 
 /** First UTC-midnight day of the UTC month `date` falls in. */
 export function startOfUtcMonth(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+  return inUtcFrame(date, startOfMonth);
 }
 
-/** `date` advanced by `months` whole UTC months, anchored on the 1st. */
+/**
+ * `date` advanced by `months` whole UTC months, anchored on the 1st. Anchoring
+ * before adding means `addMonths`' own day-clamping never applies, so the result
+ * is the requested month even from a 31st.
+ */
 export function addUtcMonths(date: Date, months: number): Date {
-  return new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, 1),
-  );
+  return inUtcFrame(date, (utc) => addMonths(startOfMonth(utc), months));
 }
 
 /**
