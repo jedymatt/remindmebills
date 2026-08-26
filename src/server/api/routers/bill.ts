@@ -125,9 +125,9 @@ export const billRouter = createTRPCRouter({
       }
 
       const groupOid = await resolveGroupId(ctx, input.data.groupId);
-      const update: Record<string, unknown> = {
-        ...omit(input.data, ["groupId"]),
-      };
+      // `omit` already returns a fresh object, so this is safe to mutate below
+      // without a further spread or clone.
+      const update: Record<string, unknown> = omit(input.data, ["groupId"]);
       if (groupOid !== null) update.groupId = groupOid;
 
       const setOps: Record<string, unknown> = { $set: update };
