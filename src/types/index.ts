@@ -13,6 +13,10 @@ export type BillEvent = {
   amount?: number;
   userId: string;
   groupId?: string | null;
+  // Present = this bill is a BNPL installment purchase, and names the account
+  // it belongs to. Absent = an ordinary bill. Presence is the only
+  // discriminator, which is why no migration was needed to introduce it.
+  bnplAccountId?: string | null;
 } & (Single | Recurring);
 
 // PlaygroundBillData: bill fields without the local id.

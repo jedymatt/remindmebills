@@ -188,3 +188,33 @@ export function getPayPeriodsByCount(
     };
   });
 }
+
+/**
+ * Split rows into ordinary bills and BNPL installments.
+ *
+ * BNPL purchases share the `bills` collection, so `bill.getAll` returns both
+ * kinds. This is the single place that filter is spelled: a polymorphic
+ * collection rots when each call site writes its own predicate, and a missed
+ * one leaks installments back into a list as individual rows — the exact
+ * clutter the BNPL feature removes.
+ *
+ * Generic over the element type because two shapes need it: raw `BillEvent`s
+ * (the summary cards) and generated occurrence rows (`BillEvent & { date: Date }`,
+ * the bill list).
+ */
+export function partitionBills<T extends { bnplAccountId?: string | null }>(
+  rows: T[],
+): { bills: T[]; installments: T[] } {
+  const bills: T[] = [];
+  const installments: T[] = [];
+
+  for (const row of rows) {
+    if (row.bnplAccountId) {
+      installments.push(row);
+    } else {
+      bills.push(row);
+    }
+  }
+
+  return { bills, installments };
+}
