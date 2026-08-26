@@ -77,13 +77,16 @@ function PlaygroundPageInner() {
   const { data: incomeProfile, isLoading } =
     api.income.getIncomeProfile.useQuery();
 
+  // A one-shot flag meaning "past hydration", not state synchronization: the
+  // skeleton below renders until it flips, so server and client produce
+  // identical first-render HTML even when the React Query cache already holds
+  // data from a previous navigation. The rule cannot tell a hydration probe
+  // apart from a cascading-render mistake, so this exception is permanent.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration probe
     setMounted(true);
   }, []);
 
-  // Show skeleton on first render so server and client produce identical HTML,
-  // preventing the hydration mismatch that occurs when the React Query cache
-  // already has data from a previous page navigation.
   if (!mounted || isLoading) {
     return <PlaygroundSkeleton />;
   }

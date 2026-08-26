@@ -12,7 +12,7 @@ Remind Me Bills — a Next.js full-stack app for tracking bills and recurring pa
 pnpm dev              # Dev server with Turbopack
 pnpm build            # Production build
 pnpm preview          # Build + start production server locally
-pnpm check            # Lint + typecheck (run before committing)
+pnpm check            # Typecheck + lint + tests (run before committing)
 pnpm lint             # ESLint only
 pnpm lint:fix         # ESLint with auto-fix
 pnpm typecheck        # TypeScript type checking only
@@ -26,7 +26,13 @@ pnpm test:watch       # Vitest watch mode
 ```
 
 Vitest covers pure helpers only — there is no harness for tRPC routers or
-components, so router logic is verified by review and by hand.
+components, so router logic is verified by review and by hand (tracked in #47).
+
+`pnpm check` runs the three gates in order — `tsc --noEmit && eslint . && vitest
+run` — so the fastest decisive signal comes first. Note that Next 16 removed
+`next lint`, so ESLint is invoked directly; `eslint-config-next` must stay in
+lockstep with `next`, and its flat config is consumed via its native
+`eslint-config-next/core-web-vitals` entrypoint (no `FlatCompat` shim).
 
 ## Architecture
 

@@ -1,15 +1,14 @@
-import { FlatCompat } from "@eslint/eslintrc";
+import nextVitals from "eslint-config-next/core-web-vitals";
 import tseslint from "typescript-eslint";
 
-const compat = new FlatCompat({
-  baseDirectory: import.meta.dirname,
-});
-
+// Flat config, consumed directly by the ESLint CLI. Next 16 removed `next lint`
+// and the `eslint` key in next.config.js, so `pnpm lint` invokes `eslint`
+// itself; `eslint-config-next/core-web-vitals` is that package's native flat
+// entrypoint, which is why no `FlatCompat` shim is needed here. It also brings
+// its own ignores (`.next/**`, `out/**`, `build/**`, `next-env.d.ts`), so this
+// file does not repeat them.
 export default tseslint.config(
-  {
-    ignores: [".next"],
-  },
-  ...compat.extends("next/core-web-vitals"),
+  ...nextVitals,
   {
     files: ["**/*.ts", "**/*.tsx"],
     extends: [
