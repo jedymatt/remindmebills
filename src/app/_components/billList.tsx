@@ -475,6 +475,20 @@ export function BillList() {
     setModalOpen(true);
   };
 
+  // Clearing the id on close is what retires `bill.getById`: while it is set the
+  // query stays ACTIVE, so any later invalidation refetches a bill nobody is
+  // looking at -- and if that bill was just deleted, the refetch 404s and toasts
+  // "This bill no longer exists". Not just the delete path: `groupManager`
+  // invalidates every `getById` with no id filter.
+  //
+  // Clearing in the same tick as `open=false` trips <BillModal>'s
+  // `if (!billId) return null`, so the dialog unmounts before Radix can play its
+  // close animation. Accepted: the abrupt close is worth more than the fade.
+  const handleModalOpenChange = (open: boolean) => {
+    setModalOpen(open);
+    if (!open) setSelectedBillId(null);
+  };
+
   const handleTogglePaid = (bill: BillRow) => {
     const key = occurrenceKey(bill._id, bill.date);
     const currentlyPaid = paidKeys.has(key);
@@ -529,7 +543,7 @@ export function BillList() {
       <BillModal
         billId={selectedBillId}
         open={modalOpen}
-        onOpenChange={setModalOpen}
+        onOpenChange={handleModalOpenChange}
       />
     </>
   );

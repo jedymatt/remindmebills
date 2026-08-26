@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { api } from "~/trpc/react";
@@ -147,6 +147,7 @@ function BillEditMode({
 export function BillModal({ billId, open, onOpenChange }: BillModalProps) {
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const reportedError = useRef<unknown>(null);
 
   const {
     data: bill,
@@ -156,13 +157,18 @@ export function BillModal({ billId, open, onOpenChange }: BillModalProps) {
 
   const utils = api.useUtils();
   const deleteBill = api.bill.delete.useMutation({
-    onSuccess: async () => {
-      await Promise.all([
-        utils.bill.getAll.invalidate(),
-        utils.bill.getById.invalidate({ id: bill?._id }),
-      ]);
-      toast.success("Bill deleted successfully");
+    onSuccess: () => {
+      // Deliberately does NOT invalidate `bill.getById` for this id. The bill is
+      // gone, so invalidation would refetch it, take a NOT_FOUND, and retry
+      // three more times behind exponential backoff before the promise settles
+      // -- several seconds of a modal that will not close, followed by a bogus
+      // "no longer exists" toast. Clearing `selectedBillId` on close is what
+      // retires that query; the stale cache entry expires on its own.
+      // Closing before the list refresh keeps the close instant: nothing the
+      // user can still see is waiting on `getAll`.
       onOpenChange(false);
+      toast.success("Bill deleted successfully");
+      void utils.bill.getAll.invalidate();
     },
     onError: (error) => {
       if (error.data?.code === "NOT_FOUND") {
@@ -199,16 +205,22 @@ export function BillModal({ billId, open, onOpenChange }: BillModalProps) {
     setMode("view");
   };
 
-  // Handle NOT_FOUND error from getById query
-  if (error) {
+  // Reporting a load failure is a side effect, so it runs in an effect rather
+  // than in the render path, where every re-render that saw a set `error` would
+  // fire another toast. The ref keeps that true even if a caller passes an
+  // unstable `onOpenChange`, which would otherwise re-run this effect.
+  useEffect(() => {
+    if (!error || reportedError.current === error) return;
+    reportedError.current = error;
     if (error.data?.code === "NOT_FOUND") {
       toast.error("This bill no longer exists");
       onOpenChange(false);
     } else {
       toast.error("Failed to load bill");
     }
-    return null;
-  }
+  }, [error, onOpenChange]);
+
+  if (error) return null;
 
   if (!billId) return null;
 
