@@ -41,6 +41,17 @@ export type PlaygroundBill =
       recurrence: Recurrence;
     };
 
+// A BNPL provider account (Shopee SPayLater, LazPayLater, …). The account owns
+// the shared monthly `dueDay`: every purchase under it derives its schedule from
+// that day, which is what makes one consolidated statement per month structural
+// rather than a data-entry convention.
+export interface BnplAccount {
+  _id: string;
+  userId: string;
+  name: string;
+  dueDay: number;
+}
+
 export interface IncomeProfile {
   payFrequency: "weekly" | "fortnightly" | "monthly";
   startDate: Date;
