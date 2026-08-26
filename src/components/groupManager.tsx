@@ -221,10 +221,15 @@ export function GroupManager() {
   const [editing, setEditing] = useState<Group | null>(null);
   const [deleting, setDeleting] = useState<Group | null>(null);
 
-  // Local copy used to drive optimistic reorder. Reset whenever the
-  // server data changes.
+  // Local copy used to drive optimistic reorder, reset whenever the server data
+  // changes. Mirroring query data into state costs an extra render pass on every
+  // refetch and lets the local copy transiently disagree with the server; the
+  // real fix (derive during render, or let React Query own the optimistic state)
+  // is tracked in #50. Suppressed narrowly rather than downgrading the rule, so
+  // it keeps guarding new code.
   const [orderedGroups, setOrderedGroups] = useState<Group[]>([]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see #50
     if (groups) setOrderedGroups(groups);
   }, [groups]);
 
