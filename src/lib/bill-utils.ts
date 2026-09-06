@@ -3,9 +3,10 @@ import { RRule } from "rrule";
 import {
   addUtcMonths,
   localDateToUtcDateOnly,
+  startOfUtcMonth,
   utcDateInMonth,
 } from "./date-utils";
-import type { BillEvent, IncomeProfile } from "~/types";
+import type { BillEvent, IncomeProfile, PayDay } from "~/types";
 
 export function getFrequency(freq: "weekly" | "fortnightly" | "monthly") {
   const frequency = {
@@ -16,7 +17,92 @@ export function getFrequency(freq: "weekly" | "fortnightly" | "monthly") {
   return frequency[freq];
 }
 
-export function createPayRule(incomeProfile: IncomeProfile) {
+/**
+ * The slice of `RRule` the pay-period helpers actually use. `RRule` satisfies it
+ * as-is, so the simple frequencies keep returning one unchanged while
+ * semi-monthly — which rrule cannot express — supplies its own implementation.
+ */
+export interface PaySchedule {
+  before(dt: Date, inc?: boolean): Date | null;
+  after(dt: Date, inc?: boolean): Date | null;
+  between(after: Date, before: Date, inc?: boolean): Date[];
+}
+
+/**
+ * Both payday kinds reduce to one clamped lookup: `utcDateInMonth` caps the day
+ * at the month's length, so 31 always lands on the last day and a 30 falls back
+ * to Feb 28 on its own.
+ */
+function payDayInMonth(monthOf: Date, day: PayDay): Date {
+  return utcDateInMonth(monthOf, day === "last" ? 31 : day);
+}
+
+/**
+ * Semi-monthly cannot be an `RRule`: `bymonthday: [15, 30]` *skips* February
+ * rather than clamping into it, which would silently merge two pay periods into
+ * one month-long period. This walks months instead and clamps, the same way
+ * `monthlyOccurrencesInPeriod` does for bills.
+ *
+ * `startDate` is only an anchor here — the paydays define the schedule — so it
+ * is pulled back to the 1st of its month. Anchoring on, say, the 20th would
+ * otherwise hide that month's 15th and strand the period the user is standing in.
+ */
+function semiMonthlySchedule(
+  startDate: Date,
+  payDays: [PayDay, PayDay],
+): PaySchedule {
+  const anchor = startOfUtcMonth(startDate);
+
+  function* occurrences() {
+    // Occurrences increase monotonically, so every consumer below stops at its
+    // own bound; the cap is a defensive backstop against pathological input.
+    for (let i = 0; i < 12_000; i++) {
+      const month = addUtcMonths(anchor, i);
+      const days = payDays
+        .map((day) => payDayInMonth(month, day))
+        .sort((a, b) => a.getTime() - b.getTime());
+
+      // Two paydays can clamp onto the same date (30 and "last" both land on
+      // Feb 28). Emitting it twice would make `after` return the date it was
+      // given, and getPayPeriodsByCount walks with repeated `after` calls.
+      yield days[0]!;
+      if (!isEqual(days[0]!, days[1]!)) yield days[1]!;
+    }
+  }
+
+  return {
+    before(dt, inc = false) {
+      let last: Date | null = null;
+      for (const date of occurrences()) {
+        if (isAfter(date, dt) || (!inc && isEqual(date, dt))) break;
+        last = date;
+      }
+      return last;
+    },
+    after(dt, inc = false) {
+      for (const date of occurrences()) {
+        if (isAfter(date, dt) || (inc && isEqual(date, dt))) return date;
+      }
+      return null;
+    },
+    between(after, before, inc = false) {
+      const dates: Date[] = [];
+      for (const date of occurrences()) {
+        if (isAfter(date, before) || (!inc && isEqual(date, before))) break;
+        if (isAfter(date, after) || (inc && isEqual(date, after))) {
+          dates.push(date);
+        }
+      }
+      return dates;
+    },
+  };
+}
+
+export function createPayRule(incomeProfile: IncomeProfile): PaySchedule {
+  if (incomeProfile.payFrequency === "semimonthly") {
+    return semiMonthlySchedule(incomeProfile.startDate, incomeProfile.payDays);
+  }
+
   return new RRule({
     dtstart: incomeProfile.startDate,
     ...getFrequency(incomeProfile.payFrequency),

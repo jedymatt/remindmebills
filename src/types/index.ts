@@ -52,11 +52,31 @@ export interface BnplAccount {
   dueDay: number;
 }
 
-export interface IncomeProfile {
-  payFrequency: "weekly" | "fortnightly" | "monthly";
-  startDate: Date;
-  amount?: number;
-}
+/**
+ * A day of the month a pay lands on. A number is clamped to the month's last
+ * day when the month is shorter (a 30th payday falls on Feb 28), matching how
+ * recurring bills already behave. `"last"` always means the final day, which is
+ * a different intent: "the 30th" and "katapusan" diverge in every 31-day month.
+ */
+export type PayDay = number | "last";
+
+/**
+ * Semi-monthly carries its own paydays; the other frequencies derive everything
+ * from `startDate`. Split as a union so `payDays` cannot be set on a profile
+ * where it would mean nothing.
+ */
+export type IncomeProfile =
+  | {
+      payFrequency: "weekly" | "fortnightly" | "monthly";
+      startDate: Date;
+      amount?: number;
+    }
+  | {
+      payFrequency: "semimonthly";
+      payDays: [PayDay, PayDay];
+      startDate: Date;
+      amount?: number;
+    };
 
 export interface Group {
   _id: string;
