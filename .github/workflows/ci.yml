@@ -1,9 +1,26 @@
 name: CI
 
+# `paths-ignore` is repeated per event because GitHub Actions does not expand
+# YAML anchors in workflow files.
+#
+# All three gates only ever read the Node app: `tsc --noEmit`, `eslint .` (whose
+# TS rules match `**/*.ts(x)`) and Vitest over `src/**/*.test.ts`. Nothing under
+# `android/` is reachable by any of them, so a run triggered by a Kotlin or
+# Gradle change reports a verdict it never actually tested.
+#
+# A run is skipped only when *every* file in the push or PR matches, so a change
+# touching both `android/` and `src/` still runs the full matrix. A skipped run
+# blocks nothing today — the `main` ruleset covers only deletion and
+# non-fast-forward — but promoting these jobs to required status checks later
+# would turn a skipped run into a permanently pending one.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "android/**"
   pull_request:
+    paths-ignore:
+      - "android/**"
 
 # Superseded PR runs are abandoned; pushes to main always finish, so the default
 # branch's status is never left ambiguous.
