@@ -1,0 +1,811 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Competitive and market analysis for Remind Me Bills: where the bill-reminder category is saturated, and where BNPL statement tracking is not.">
+  <style>
+    /* Baseline the Artifact host normally supplies; kept here so the file
+       renders identically when opened straight from the repo. */
+    html { color-scheme: light dark; }
+    body { margin: 0; }
+    img { max-width: 100%; }
+    [hidden] { display: none !important; }
+  </style>
+  <title>The BNPL Gap</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+  <style>
+    :root {
+      --paper:      #f6f8f6;
+      --surface:    #ffffff;
+      --sunk:       #eef3f0;
+      --ink:        #101f1a;
+      --ink-2:      #4c5e57;
+      --ink-3:      #788b83;
+      --rule:       #d9e3de;
+      --rule-hard:  #b9c8c1;
+      --accent:     #04704f;
+      --accent-soft:#e4f1eb;
+      --crit:       #97332a;
+      --crit-soft:  #f8e9e6;
+      --warn:       #8a6210;
+      --warn-soft:  #f8f0dd;
+      --ok:         #2c6a4d;
+      --ok-soft:    #e4f1e9;
+
+      --serif: "Newsreader", ui-serif, Georgia, serif;
+      --sans:  "Public Sans", ui-sans-serif, system-ui, sans-serif;
+      --mono:  "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --paper:      #0d1512;
+        --surface:    #141e1a;
+        --sunk:       #101915;
+        --ink:        #e7efea;
+        --ink-2:      #9db1a8;
+        --ink-3:      #74887f;
+        --rule:       #26332e;
+        --rule-hard:  #38473f;
+        --accent:     #57c69c;
+        --accent-soft:#152b23;
+        --crit:       #e2887c;
+        --crit-soft:  #2b1815;
+        --warn:       #d9ac54;
+        --warn-soft:  #29200e;
+        --ok:         #6cbd93;
+        --ok-soft:    #14251c;
+      }
+    }
+
+    :root[data-theme="dark"] {
+      --paper:      #0d1512;
+      --surface:    #141e1a;
+      --sunk:       #101915;
+      --ink:        #e7efea;
+      --ink-2:      #9db1a8;
+      --ink-3:      #74887f;
+      --rule:       #26332e;
+      --rule-hard:  #38473f;
+      --accent:     #57c69c;
+      --accent-soft:#152b23;
+      --crit:       #e2887c;
+      --crit-soft:  #2b1815;
+      --warn:       #d9ac54;
+      --warn-soft:  #29200e;
+      --ok:         #6cbd93;
+      --ok-soft:    #14251c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.62;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .page {
+      display: grid;
+      grid-template-columns: 1fr min(66ch, calc(100% - 2.5rem)) 1fr;
+      row-gap: 0;
+      padding: 0 0 5rem;
+    }
+    .page > * { grid-column: 2; }
+    .wide {
+      grid-column: 1 / -1;
+      width: min(1120px, calc(100% - 2.5rem));
+      margin-inline: auto;
+    }
+
+    /* ---------- masthead ---------- */
+
+    .masthead {
+      padding: 3.5rem 0 2rem;
+      border-bottom: 2px solid var(--ink);
+      margin-bottom: 2.5rem;
+    }
+    .eyebrow {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 1.1rem;
+    }
+    h1 {
+      font-family: var(--serif);
+      font-weight: 500;
+      font-size: clamp(2.4rem, 6vw, 3.5rem);
+      line-height: 1.04;
+      letter-spacing: -0.02em;
+      text-wrap: balance;
+      margin: 0 0 1rem;
+    }
+    .standfirst {
+      font-family: var(--serif);
+      font-size: 1.2rem;
+      line-height: 1.5;
+      color: var(--ink-2);
+      margin: 0 0 1.5rem;
+      text-wrap: pretty;
+    }
+    .byline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1.4rem;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.04em;
+      color: var(--ink-3);
+    }
+
+    /* ---------- sections ---------- */
+
+    section { padding: 2.75rem 0 0; }
+    .sec-head {
+      display: flex;
+      align-items: baseline;
+      gap: 0.85rem;
+      border-top: 1px solid var(--rule-hard);
+      padding-top: 0.85rem;
+      margin-bottom: 1.5rem;
+    }
+    .sec-num {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: var(--ink-3);
+      flex: none;
+    }
+    h2 {
+      font-family: var(--serif);
+      font-weight: 500;
+      font-size: 1.72rem;
+      line-height: 1.16;
+      letter-spacing: -0.012em;
+      text-wrap: balance;
+      margin: 0;
+    }
+    h3 {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: 0.95rem;
+      letter-spacing: 0.005em;
+      margin: 2rem 0 0.6rem;
+    }
+    p { margin: 0 0 1.05rem; text-wrap: pretty; }
+    a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+    a:focus-visible, .m-tbl a:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 2px;
+    }
+    strong { font-weight: 600; }
+    em { font-style: italic; }
+    code, .num {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ---------- verdict: two opposed panels ---------- */
+
+    .verdict {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(290px, 100%), 1fr));
+      gap: 1px;
+      background: var(--rule-hard);
+      border: 1px solid var(--rule-hard);
+      margin: 0 0 0.5rem;
+    }
+    .v-cell { background: var(--surface); padding: 1.6rem 1.5rem; }
+    .v-cell.is-crowded { background: var(--sunk); }
+    .v-tag {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin: 0 0 0.7rem;
+    }
+    .is-crowded .v-tag { color: var(--crit); }
+    .is-open .v-tag { color: var(--ok); }
+    .v-claim {
+      font-family: var(--serif);
+      font-size: 1.3rem;
+      line-height: 1.32;
+      margin: 0 0 0.7rem;
+      text-wrap: pretty;
+    }
+    .v-body { font-size: 0.9rem; color: var(--ink-2); margin: 0; }
+
+    /* ---------- figures ---------- */
+
+    .figs {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+      gap: 1.5rem 2rem;
+      border-top: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
+      padding: 1.6rem 0;
+      margin: 0 0 1.5rem;
+    }
+    .fig-n {
+      font-family: var(--mono);
+      font-weight: 500;
+      font-size: 2rem;
+      line-height: 1;
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums;
+      color: var(--accent);
+      display: block;
+      margin-bottom: 0.5rem;
+    }
+    .fig-l {
+      font-size: 0.82rem;
+      line-height: 1.4;
+      color: var(--ink-2);
+      display: block;
+    }
+    .fig-s {
+      font-family: var(--mono);
+      font-size: 0.66rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      display: block;
+      margin-top: 0.45rem;
+    }
+
+    /* ---------- pull quote ---------- */
+
+    .pull {
+      border-left: 3px solid var(--accent);
+      padding: 0.15rem 0 0.15rem 1.2rem;
+      margin: 1.6rem 0;
+    }
+    .pull p {
+      font-family: var(--serif);
+      font-size: 1.16rem;
+      line-height: 1.45;
+      color: var(--ink);
+      margin: 0;
+    }
+
+    /* ---------- matrix ---------- */
+
+    .scroller {
+      overflow-x: auto;
+      border: 1px solid var(--rule-hard);
+      background: var(--surface);
+    }
+    .m-tbl {
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 860px;
+      font-size: 0.83rem;
+    }
+    .m-tbl th, .m-tbl td {
+      text-align: left;
+      padding: 0.62rem 0.7rem;
+      border-bottom: 1px solid var(--rule);
+      vertical-align: top;
+    }
+    .m-tbl thead th {
+      font-family: var(--mono);
+      font-size: 0.64rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ink-2);
+      background: var(--sunk);
+      border-bottom: 1px solid var(--rule-hard);
+      position: sticky;
+      top: 0;
+      line-height: 1.3;
+    }
+    .m-tbl tbody th {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: 0.84rem;
+      white-space: nowrap;
+    }
+    .m-tbl tbody tr:last-child th,
+    .m-tbl tbody tr:last-child td { border-bottom: none; }
+    .m-tbl .mine {
+      background: var(--accent-soft);
+      border-top: 2px solid var(--accent);
+    }
+    .m-tbl .mine th { color: var(--accent); }
+    .m-tbl .dead th { color: var(--ink-3); text-decoration: line-through; }
+    .m-tbl .plat, .m-tbl .price {
+      font-family: var(--mono);
+      font-size: 0.74rem;
+      color: var(--ink-2);
+      white-space: nowrap;
+    }
+    .mark { font-family: var(--mono); font-weight: 600; font-size: 0.9rem; }
+    .yes  { color: var(--ok); }
+    .no   { color: var(--ink-3); }
+    .part { color: var(--warn); }
+    .m-note {
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.04em;
+      color: var(--ink-3);
+      margin: 0.7rem 0 0;
+    }
+
+    /* ---------- gap list ---------- */
+
+    .gaps {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      border-top: 1px solid var(--rule-hard);
+    }
+    .gaps > li {
+      display: grid;
+      grid-template-columns: 2.3rem 1fr;
+      gap: 0 0.9rem;
+      padding: 1.3rem 0;
+      border-bottom: 1px solid var(--rule);
+    }
+    .g-rank {
+      font-family: var(--mono);
+      font-size: 0.95rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--ink-3);
+      line-height: 1.5;
+    }
+    .g-top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem 0.7rem;
+      margin-bottom: 0.35rem;
+    }
+    .g-name { font-weight: 600; font-size: 1rem; }
+    .chip {
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      font-weight: 600;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      padding: 0.2rem 0.45rem;
+      border-radius: 2px;
+      white-space: nowrap;
+    }
+    .chip-crit { background: var(--crit-soft); color: var(--crit); }
+    .chip-warn { background: var(--warn-soft); color: var(--warn); }
+    .chip-ok   { background: var(--ok-soft);   color: var(--ok); }
+    .g-body { font-size: 0.9rem; color: var(--ink-2); margin: 0; }
+    .g-body + .g-body { margin-top: 0.5rem; }
+    .g-you {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.03em;
+      color: var(--ink-3);
+      display: block;
+      margin-top: 0.5rem;
+      padding-top: 0.5rem;
+      border-top: 1px dotted var(--rule-hard);
+    }
+
+    /* ---------- price table ---------- */
+
+    .simple {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.87rem;
+      margin: 0 0 1.1rem;
+    }
+    .simple th, .simple td {
+      text-align: left;
+      padding: 0.55rem 0.7rem 0.55rem 0;
+      border-bottom: 1px solid var(--rule);
+    }
+    .simple thead th {
+      font-family: var(--mono);
+      font-size: 0.64rem;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      border-bottom: 1px solid var(--rule-hard);
+    }
+    .simple td.r {
+      font-family: var(--mono);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    /* ---------- callout ---------- */
+
+    .callout {
+      background: var(--surface);
+      border: 1px solid var(--rule-hard);
+      border-left: 3px solid var(--crit);
+      padding: 1.3rem 1.4rem;
+      margin: 1.5rem 0;
+    }
+    .callout .v-tag { color: var(--crit); }
+    .callout p:last-child { margin-bottom: 0; }
+    .callout p { font-size: 0.92rem; }
+
+    /* ---------- close ---------- */
+
+    .close-list { margin: 0; padding-left: 1.2rem; }
+    .close-list li { margin-bottom: 0.7rem; }
+
+    .srcs { list-style: none; margin: 0; padding: 0; }
+    .srcs li {
+      font-size: 0.8rem;
+      padding: 0.42rem 0;
+      border-bottom: 1px solid var(--rule);
+      line-height: 1.45;
+    }
+    .srcs a { word-break: break-word; }
+    .srcs .s-k {
+      font-family: var(--mono);
+      font-size: 0.66rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      display: block;
+    }
+
+    .caveat {
+      font-size: 0.83rem;
+      color: var(--ink-3);
+      border-top: 1px solid var(--rule);
+      padding-top: 1.1rem;
+      margin-top: 1.6rem;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <header class="masthead">
+    <p class="eyebrow">Competitive read · Remind Me Bills</p>
+    <h1>The BNPL Gap</h1>
+    <p class="standfirst">You are right that the bill-reminder market is crowded. You are wrong that it makes your app redundant — the crowd is standing somewhere else.</p>
+    <div class="byline">
+      <span>2 September 2026</span>
+      <span>Market: Philippines</span>
+      <span>Focus: requirements &amp; features</span>
+    </div>
+  </header>
+
+  <div class="verdict wide">
+    <div class="v-cell is-crowded">
+      <p class="v-tag">Saturated</p>
+      <p class="v-claim">Reminders, recurrence, calendars, mark-as-paid.</p>
+      <p class="v-body">Solved by a dozen apps for a one-off $7.99 — and already inside GCash, GlobeOne and My Meralco, where Filipinos actually pay. Pay-period framing and no-bank-link privacy, which look like your differentiators, are competitors' existing marketing bullets.</p>
+    </div>
+    <div class="v-cell is-open">
+      <p class="v-tag">Uncontested</p>
+      <p class="v-claim">One statement view across every BNPL provider a person uses.</p>
+      <p class="v-body">SPayLater lives in Shopee, LazPayLater in Lazada, BillEase and Atome in their own apps — each on a different cycle convention. Nothing found consolidates them, and nothing found puts them beside an electricity bill.</p>
+    </div>
+  </div>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">01</span><h2>The demand is a timing problem, not a credit problem</h2></div>
+
+    <div class="figs wide">
+      <div>
+        <span class="fig-n">44%</span>
+        <span class="fig-l">of Filipinos have used a BNPL service</span>
+        <span class="fig-s">Fintech News PH</span>
+      </div>
+      <div>
+        <span class="fig-n">$8.90B</span>
+        <span class="fig-l">PH BNPL volume in 2026, up 20.7% year on year</span>
+        <span class="fig-s">→ $18.81B by 2031</span>
+      </div>
+      <div>
+        <span class="fig-n">34–41%</span>
+        <span class="fig-l">of BNPL users report at least one late payment</span>
+        <span class="fig-s">Global</span>
+      </div>
+      <div>
+        <span class="fig-n">1.8–2%</span>
+        <span class="fig-l">actually default (charge-offs)</span>
+        <span class="fig-s">Global</span>
+      </div>
+    </div>
+
+    <p>Those last two figures are the whole argument for your app, and they only mean something side by side. Two in five BNPL users miss a payment. Fewer than one in fifty cannot pay. The gap between those numbers is people who had the money and lost track of the date.</p>
+
+    <div class="pull">
+      <p>That is not a lending problem or a budgeting problem. It is a reminder problem — which is the product you have already half-built.</p>
+    </div>
+
+    <p>It is also a fragmentation problem, and the PH market is unusually fragmented. A single shopper can plausibly hold SPayLater, LazPayLater, BillEase, Atome, GGives, GrabPayLater, Cashalo and TendoPay. Each tracks repayment only inside its own app, and the cycle rules do not agree with one another:</p>
+
+    <table class="simple">
+      <thead>
+        <tr><th>Provider</th><th>Statement cycle</th><th>Due</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>SPayLater (Shopee)</td><td class="r">Cycle opens 5th <em>or</em> 25th, per user</td><td class="r">15th</td></tr>
+        <tr><td>LazPayLater (Lazada)</td><td class="r">1st → end of month</td><td class="r">16th</td></tr>
+      </tbody>
+    </table>
+
+    <p>Two providers, two conventions, two apps, and a per-user variable in one of them. Add a third and a fourth and the mental arithmetic is where the 34–41% comes from.</p>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">02</span><h2>What the field actually covers</h2></div>
+
+    <p>Every row is a real product. The columns are the capabilities that matter for the job your app is doing, not a generic feature census.</p>
+
+    <div class="scroller wide">
+      <table class="m-tbl">
+        <thead>
+          <tr>
+            <th scope="col">Product</th>
+            <th scope="col">Sends reminders</th>
+            <th scope="col">Pay-period view</th>
+            <th scope="col">PH semi-monthly</th>
+            <th scope="col">No bank link</th>
+            <th scope="col">BNPL statement model</th>
+            <th scope="col">Multi-provider BNPL</th>
+            <th scope="col">Shared bills</th>
+            <th scope="col">Platform</th>
+            <th scope="col">Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">BillOut</th>
+            <td><span class="mark yes">✓</span></td>
+            <td><span class="mark yes">✓</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark yes">✓</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark yes">✓</span></td>
+            <td class="plat">iOS · Android</td>
+            <td class="price">$7.99 once</td>
+          </tr>
+          <tr>
+            <th scope="row">TimelyBills</th>
+            <td><span class="mark yes">✓</span></td>
+            <td><span class="mark part">~</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark yes">✓</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark yes">✓</span></td>
+            <td class="plat">iOS · Android</td>
+            <td class="price">$0.99–6.99/mo</td>
+          </tr>
+          <tr>
+            <th scope="row">Cash Flow Calendar</th>
+            <td><span class="mark yes">✓</span></td>
+            <td><span class="mark yes">✓</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark part">~</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark no">—</span></td>
+            <td class="plat">iOS</td>
+            <td class="price">Subscription</td>
+          </tr>
+          <tr>
+            <th scope="row">Moneygment</th>
+            <td><span class="mark yes">✓</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark part">~</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark no">—</span></td>
+            <td class="plat">iOS · Android</td>
+            <td class="price">Free + fees</td>
+          </tr>
+          <tr>
+            <th scope="row">GCash Pay Bills</th>
+            <td><span class="mark yes">✓</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark no">—</span></td>
+            <td class="plat">iOS · Android</td>
+            <td class="price">Free</td>
+          </tr>
+          <tr>
+            <th scope="row">Provider apps</th>
+            <td><span class="mark yes">✓</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark yes">✓</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark no">—</span></td>
+            <td class="plat">iOS · Android</td>
+            <td class="price">Free</td>
+          </tr>
+          <tr class="dead">
+            <th scope="row">Cushion</th>
+            <td><span class="mark yes">✓</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark yes">✓</span></td>
+            <td><span class="mark yes">✓</span></td>
+            <td><span class="mark no">—</span></td>
+            <td class="plat">Dead Jan 2025</td>
+            <td class="price">—</td>
+          </tr>
+          <tr class="mine">
+            <th scope="row">Remind Me Bills</th>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark yes">✓</span></td>
+            <td><span class="mark no">—</span></td>
+            <td><span class="mark yes">✓</span></td>
+            <td><span class="mark yes">✓</span></td>
+            <td><span class="mark yes">✓</span></td>
+            <td><span class="mark no">—</span></td>
+            <td class="plat">Web only</td>
+            <td class="price">—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="m-note wide">✓ present · ~ partial or adjacent · — absent. "Provider apps" = SPayLater, LazPayLater, BillEase, Atome et al., each for its own balance only.</p>
+
+    <p>Read down the two BNPL columns. You and a company that no longer exists are the only rows with both. Read across your own row and the picture is less comfortable.</p>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">03</span><h2>Your app cannot currently remind anyone</h2></div>
+
+    <div class="callout">
+      <p class="v-tag">Verified in the codebase</p>
+      <p>There is no notification delivery of any kind: no push, no email, no SMS, no cron or scheduled job, and no dependency capable of sending anything. <code>vercel.json</code> has no <code>crons</code> entry and <code>src/app/api/</code> holds only <code>auth/</code> and <code>trpc/</code>.</p>
+      <p>The app is a dashboard you must remember to open. For a product named <em>Remind Me Bills</em>, competing in a category whose entire value is arriving unprompted, this is the gap that matters more than every feature comparison above.</p>
+    </div>
+
+    <p>The competitive evidence makes this sharper. BillOut advertises <span class="num">2M+</span> notifications sent as its headline proof of usefulness, with alerts up to 7 days ahead. GCash's bill reminder is a one-tap "Remind me Every" toggle. And the single most common complaint across reviews in this category is <em>notifications that do not fire</em> — which tells you notifications are not a feature of these products, they <em>are</em> the product, and users judge them on nothing else.</p>
+
+    <p>A tracker that requires the user to remember to check it is asking them to already have solved the problem it exists to solve.</p>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">04</span><h2>Requirement gaps, in the order they cost you</h2></div>
+
+    <ol class="gaps">
+      <li>
+        <span class="g-rank">01</span>
+        <div>
+          <div class="g-top"><span class="g-name">Reminder delivery</span><span class="chip chip-crit">Blocking</span></div>
+          <p class="g-body">Push or email, scheduled, with a configurable lead time. Everything else in the product is downstream of this working. Table stakes for the category, and absent.</p>
+          <span class="g-you">Your app: none. Every competitor: yes.</span>
+        </div>
+      </li>
+      <li>
+        <span class="g-rank">02</span>
+        <div>
+          <div class="g-top"><span class="g-name">Semi-monthly pay periods</span><span class="chip chip-crit">Blocking for PH</span></div>
+          <p class="g-body">Semi-monthly is the standard Philippine payroll schedule — the 15th and 30th, with 10th/25th and 5th/20th as common variants. Article 103 of the Labor Code requires intervals not exceeding 16 days, so it is close to universal.</p>
+          <p class="g-body"><code>IncomeProfile.payFrequency</code> offers <code>weekly | fortnightly | monthly</code>. Fortnightly is every 14 days — 26 pay dates a year, drifting through the calendar. Semi-monthly is 24 fixed dates. They are not interchangeable, and substituting one silently misplaces every bill in the pay-period view within two months.</p>
+          <span class="g-you">Your core differentiating view is calibrated to a pay cycle your likely market does not use.</span>
+        </div>
+      </li>
+      <li>
+        <span class="g-rank">03</span>
+        <div>
+          <div class="g-top"><span class="g-name">Amount due per period, totalled</span><span class="chip chip-warn">High demand</span></div>
+          <p class="g-body">A recurring review complaint is that apps show the bills but not the sum — users reach for a calculator to answer "what do I owe before my next payday". You already bucket bills by pay period and store amounts, so this is the cheapest high-value thing on the list.</p>
+          <span class="g-you">Structurally ready; not surfaced.</span>
+        </div>
+      </li>
+      <li>
+        <span class="g-rank">04</span>
+        <div>
+          <div class="g-top"><span class="g-name">Edit one occurrence, not the series</span><span class="chip chip-warn">High demand</span></div>
+          <p class="g-body">Reviewers ask for this explicitly: "do you want to change the payment just for this month or all of them?" Bills vary month to month — electricity especially — and changing one month currently means changing the rule.</p>
+          <span class="g-you">Your <code>Payment</code> model keys settled occurrences by <code>occurrenceDate</code>, but nothing stores a per-occurrence amount override.</span>
+        </div>
+      </li>
+      <li>
+        <span class="g-rank">05</span>
+        <div>
+          <div class="g-top"><span class="g-name">Mobile presence</span><span class="chip chip-warn">Strategic</span></div>
+          <p class="g-body">BNPL purchases happen inside Shopee and Lazada, on a phone, impulsively. A web-only tracker sits the furthest possible distance from the moment a purchase needs recording — and manual entry is hardest to sustain exactly where your differentiator lives.</p>
+          <span class="g-you">Parked. Reasonable for now; not reasonable forever.</span>
+        </div>
+      </li>
+      <li>
+        <span class="g-rank">06</span>
+        <div>
+          <div class="g-top"><span class="g-name">Shared / household bills</span><span class="chip chip-ok">Competitive parity</span></div>
+          <p class="g-body">BillOut leads with it and its reviews single it out ("share some of my bills with my partner"). Household cost-splitting is culturally routine in PH. Your <code>Group</code> model organizes bills but is single-user.</p>
+          <span class="g-you">Nice-to-have, but it is the feature competitors' users praise most.</span>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">05</span><h2>The money question is harder than the product question</h2></div>
+
+    <p>This is where I would push back hardest on any plan to monetize directly.</p>
+
+    <table class="simple">
+      <thead>
+        <tr><th>Model</th><th>Median conversion</th><th>Who uses it here</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Freemium</td><td class="r">2.18%</td><td>TimelyBills</td></tr>
+        <tr><td>Hard paywall</td><td class="r">12.11%</td><td>Cash Flow Calendar</td></tr>
+        <tr><td>Emerging markets, any model</td><td class="r">&lt;0.2%</td><td>—</td></tr>
+      </tbody>
+    </table>
+
+    <p>That bottom row is the one to sit with. Reported medians below <span class="num">0.2%</span> in emerging markets mean a PH-targeted freemium finance app needs enormous reach before subscription revenue is real. It is not a coincidence that BillOut — the closest competitor by feature — chose a <span class="num">$7.99</span> one-off purchase rather than a subscription, and gives 60 days of premium before asking.</p>
+
+    <h3>What Cushion's death does and does not tell you</h3>
+
+    <p>Cushion was the one serious attempt at cross-provider BNPL aggregation — the self-described "Plaid for BNPL". It shut down in January 2025 after raising <span class="num">$21.6M</span>, onboarding <span class="num">1M</span> consumers and reaching <span class="num">200,000</span> paying customers, citing failure to reach sustaining scale.</p>
+
+    <p>Two opposite lessons sit in that sentence, and taking only one of them is the mistake. <strong>200,000 people paid for this.</strong> The demand is not hypothetical. But what Cushion sold was <em>automation</em> — parsing 30 million emails and maintaining a live integration per provider — and that is what it could not afford. Your manual-entry design has none of that cost and none of that brittleness. It also has none of that convenience, which is the trade you are making whether or not you name it.</p>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">06</span><h2>What I would do</h2></div>
+
+    <ol class="close-list">
+      <li><strong>Stop competing as a bill reminder.</strong> That category is finished, cheap, and partly owned by the wallet app your users already have open. It is a feature you need, not a position you can hold.</li>
+      <li><strong>Ship notifications before anything else.</strong> Without them the differentiator cannot be demonstrated, because nobody opens a tracker unprompted.</li>
+      <li><strong>Add semi-monthly, and make it the default.</strong> A one-line union widening, and the difference between the pay-period view working and quietly lying for most Filipino users.</li>
+      <li><strong>Position on the BNPL statement, not on bills.</strong> "Every pay-later balance in one place, next to your actual bills, before payday" is a sentence no competitor found can say.</li>
+      <li><strong>Assume you cannot charge a subscription in this market.</strong> Design toward a one-off unlock, or accept it as a portfolio piece and optimize for what you learn instead.</li>
+    </ol>
+
+    <p>Your instinct that the market is crowded is correct and worth trusting. It is crowded in front of the door you were not planning to walk through.</p>
+
+    <p class="caveat"><strong>Confidence and limits.</strong> Search coverage here is US-biased, so PH-local apps are likely under-represented — check the local App Store and Play Store listings directly before treating the BNPL gap as confirmed. Market and conversion figures are vendor and analyst reports, not audited data, and the late-payment and conversion percentages are global or multi-region rather than PH-specific. Feature columns reflect public marketing pages and review text, not hands-on testing of each app. Your own row was read from the codebase and is the most reliable line in the table. Nothing here speaks to whether anyone will pay you.</p>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">07</span><h2>Sources</h2></div>
+    <ul class="srcs">
+      <li><span class="s-k">Closest competitor · features, pricing</span><a href="https://www.billout.app/">BillOut — Bills Reminder app, Bills Organizer</a></li>
+      <li><span class="s-k">Competitor · plans</span><a href="https://www.timelybills.app/bill-organizer">TimelyBills — Bills Reminder, Budget Organizer</a></li>
+      <li><span class="s-k">Competitor · cash-flow framing</span><a href="https://www.cashflowcalendar.app/blog/bill-calendar-app-track-due-dates-paychecks">Cash Flow Calendar — bill calendar and paychecks</a></li>
+      <li><span class="s-k">Competitor · review complaints</span><a href="https://apps.apple.com/us/app/bills-organizer-reminder/id1352782733">Bills Organizer &amp; Reminder — App Store</a></li>
+      <li><span class="s-k">PH local incumbent</span><a href="https://technology.inquirer.net/136768/the-best-finance-apps-in-the-philippines">Inquirer — The best finance apps in the Philippines</a></li>
+      <li><span class="s-k">PH wallet reminders</span><a href="https://mb.com.ph/2022/7/19/gcash-payment-feature-expanded">Manila Bulletin — GCash payment feature expanded</a></li>
+      <li><span class="s-k">BNPL cycle conventions</span><a href="https://www.lumina.com.ph/news-and-blogs/blogs/spaylater-vs-lazpaylater-which-one-is-better/">Lumina — SPayLater vs LazPayLater</a></li>
+      <li><span class="s-k">PH BNPL market &amp; adoption</span><a href="https://fintechnews.ph/top-bnpl-philippines/">Fintech News PH — Top 3 BNPLs in the Philippines</a></li>
+      <li><span class="s-k">PH BNPL forecast</span><a href="https://www.globenewswire.com/news-release/2026/02/04/3231822/0/en/philippines-buy-now-pay-later-business-and-investment-report-2026-market-to-more-than-double-from-7-37-billion-to-18-81-billion-by-2031-featuring-paymaya-grabpay-later-tendopay-aku.html">GlobeNewswire — PH BNPL to $18.81B by 2031</a></li>
+      <li><span class="s-k">Late payments vs defaults</span><a href="https://www.chargeflow.io/blog/buy-now-pay-later-statistics">Chargeflow — BNPL market and provider statistics</a></li>
+      <li><span class="s-k">Aggregator shutdown</span><a href="https://techcrunch.com/2025/01/30/fintech-startup-cushion-shuts-down-after-8-years-and-over-20-million-in-funding/">TechCrunch — Cushion shuts down after 8 years</a></li>
+      <li><span class="s-k">PH payroll schedule</span><a href="https://penbrothers.com/blog/semi-monthly-meaning/">Penbrothers — Implementing semi-monthly payroll in the Philippines</a></li>
+      <li><span class="s-k">Conversion benchmarks</span><a href="https://www.revenuecat.com/state-of-subscription-apps">RevenueCat — State of Subscription Apps</a></li>
+    </ul>
+  </section>
+
+</div>
+</body>
+</html>
