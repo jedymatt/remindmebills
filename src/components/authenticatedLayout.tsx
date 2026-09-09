@@ -114,7 +114,9 @@ export function AuthenticatedLayout({ children }: PropsWithChildren) {
       <header className="border-ledger-line bg-ledger-paper/80 sticky top-0 z-50 w-full border-b backdrop-blur">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
           <div className="flex items-center gap-6">
-            <Link href="/">
+            {/* Signed-in visitors are redirected off `/` anyway, so the
+                wordmark goes straight to the dashboard. */}
+            <Link href="/dashboard">
               <Wordmark />
             </Link>
             <nav className="hidden items-center gap-4 sm:flex">

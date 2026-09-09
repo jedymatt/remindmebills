@@ -49,6 +49,17 @@ async function continueAsGuest() {
   await authClient.signIn.anonymous();
 }
 
+// Guest sign-in has no redirect of its own, so send guests to the dashboard
+// the way the Google callback does — a signed-in visitor never sits on `/`.
+function useContinueAsGuest() {
+  const router = useRouter();
+
+  return async () => {
+    await continueAsGuest();
+    router.push("/dashboard");
+  };
+}
+
 const features = [
   {
     icon: Bell,
@@ -123,13 +134,15 @@ const totalDue = upcomingBills.reduce((sum, bill) => sum + bill.amount, 0);
 const ROW_STAGGER_MS = 90;
 
 function AuthButtons() {
+  const handleContinueAsGuest = useContinueAsGuest();
+
   return (
     <div className="flex flex-col gap-3 sm:flex-row">
       <Button size="lg" onClick={signInWithGoogle}>
         Continue with Google
         <SimpleIconsGoogle className="size-4" />
       </Button>
-      <Button variant="outline" size="lg" onClick={continueAsGuest}>
+      <Button variant="outline" size="lg" onClick={handleContinueAsGuest}>
         Try as guest
         <UserRound className="size-4" />
       </Button>
