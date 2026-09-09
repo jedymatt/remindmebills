@@ -17,6 +17,7 @@ import { getPayPeriodsByCount, partitionBills } from "~/lib/bill-utils";
 import {
   groupStatements,
   isStatementPaid,
+  statementBillIds,
   statementKey,
 } from "~/lib/bnpl-utils";
 import { formatUtcDate } from "~/lib/date-utils";
@@ -24,6 +25,7 @@ import { buildPaidLookup, occurrenceKey } from "~/lib/payment-utils";
 import { UNGROUPED_COLOR, colorForOrder } from "~/lib/group-colors";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
+import type { Statement } from "~/lib/bnpl-utils";
 import type { BillEvent, BnplAccount, Group } from "~/types";
 
 function formatPHP(value: number, signDisplay?: "always") {
@@ -183,8 +185,10 @@ function BillListCard({
   ingoing,
   paidKeys,
   pendingKeys,
+  pendingStatementKeys,
   onBillClick,
   onTogglePaid,
+  onToggleStatement,
 }: {
   bills: BillRow[];
   groups: Group[];
@@ -195,8 +199,10 @@ function BillListCard({
   ingoing: number;
   paidKeys: Set<string>;
   pendingKeys: Set<string>;
+  pendingStatementKeys: Set<string>;
   onBillClick: (billId: string) => void;
   onTogglePaid: (bill: BillRow) => void;
+  onToggleStatement: (statement: Statement) => void;
 }) {
   const [excludedBills, setExcludedBills] = useState<string[]>([]);
 
@@ -368,13 +374,13 @@ function BillListCard({
               // Settled statements read as settled here too. Without this a paid
               // statement was indistinguishable from an unpaid one while the
               // ordinary bills beside it struck through and the summary card
-              // above already reported it as ₱0 remaining. Read-only: the
-              // statement toggle itself lives on /bnpl.
+              // above already reported it as ₱0 remaining.
               const isPaid = isStatementPaid(paidKeys, statement);
+              const key = statementKey(statement.accountId, statement.date);
 
               return (
                 <div
-                  key={statementKey(statement.accountId, statement.date)}
+                  key={key}
                   className={cn(
                     (sections.length > 0 || idx > 0) &&
                       "border-border/40 border-t pt-5",
@@ -387,6 +393,32 @@ function BillListCard({
                     )}
                   >
                     <div className="flex items-center gap-1.5">
+                      {/* Paid toggle — settles the statement as a unit, the same
+                          write /bnpl's account card makes. A statement has no
+                          per-purchase row here to toggle individually. */}
+                      <button
+                        type="button"
+                        className={cn(
+                          "mr-1 shrink-0 transition-colors disabled:opacity-50",
+                          isPaid
+                            ? "text-ledger-accent-strong dark:text-ledger-accent"
+                            : "text-muted-foreground/50 hover:text-muted-foreground",
+                        )}
+                        onClick={() => onToggleStatement(statement)}
+                        disabled={pendingStatementKeys.has(key)}
+                        aria-label={
+                          isPaid
+                            ? `Mark ${statement.accountName} statement unpaid`
+                            : `Mark ${statement.accountName} statement paid`
+                        }
+                        aria-pressed={isPaid}
+                      >
+                        {isPaid ? (
+                          <CircleCheckBig className="size-4" />
+                        ) : (
+                          <Circle className="size-4" />
+                        )}
+                      </button>
                       <CreditCard className="text-muted-foreground size-3.5 shrink-0" />
                       <span
                         className={cn(
@@ -435,6 +467,48 @@ export function BillList() {
   const markPaid = api.payment.markPaid.useMutation();
   const markUnpaid = api.payment.markUnpaid.useMutation();
   const [pendingKeys, setPendingKeys] = useState<Set<string>>(new Set());
+  const [pendingStatementKeys, setPendingStatementKeys] = useState<Set<string>>(
+    new Set(),
+  );
+
+  // Cleared from the hook's own `onSettled` off the settling call's variables,
+  // not from per-call `mutate` callbacks: every card shares one mutation
+  // observer, which keeps only the latest call's callbacks — so a second toggle
+  // starting before the first resolves would strand the first key and leave that
+  // statement's button disabled for good. Same reasoning as on /bnpl.
+  const settleStatement = {
+    onSettled: (
+      _data: unknown,
+      error: unknown,
+      variables: { accountId: string; statementDate: Date },
+    ) => {
+      const key = statementKey(variables.accountId, variables.statementDate);
+      const clear = () =>
+        setPendingStatementKeys((prev) => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+
+      if (error) {
+        toast.error(
+          (error as { message?: string }).message ??
+            "Failed to update statement",
+        );
+        clear();
+        return;
+      }
+      // Stay disabled until the refetch lands, so paidKeys isn't still stale
+      // when the button re-enables — mirrors handleTogglePaid.
+      void utils.payment.getAll.invalidate().finally(clear);
+    },
+  };
+
+  const markStatementPaid =
+    api.payment.markStatementPaid.useMutation(settleStatement);
+  const markStatementUnpaid =
+    api.payment.markStatementUnpaid.useMutation(settleStatement);
+
   const [selectedBillId, setSelectedBillId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PERIODS_INITIAL);
@@ -489,6 +563,20 @@ export function BillList() {
     if (!open) setSelectedBillId(null);
   };
 
+  const handleToggleStatement = (statement: Statement) => {
+    const currentlyPaid = isStatementPaid(paidKeys, statement);
+    setPendingStatementKeys((prev) =>
+      new Set(prev).add(statementKey(statement.accountId, statement.date)),
+    );
+
+    const mutation = currentlyPaid ? markStatementUnpaid : markStatementPaid;
+    mutation.mutate({
+      accountId: statement.accountId,
+      statementDate: statement.date,
+      billIds: statementBillIds(statement),
+    });
+  };
+
   const handleTogglePaid = (bill: BillRow) => {
     const key = occurrenceKey(bill._id, bill.date);
     const currentlyPaid = paidKeys.has(key);
@@ -532,8 +620,10 @@ export function BillList() {
             ingoing={ingoing}
             paidKeys={paidKeys}
             pendingKeys={pendingKeys}
+            pendingStatementKeys={pendingStatementKeys}
             onBillClick={handleBillClick}
             onTogglePaid={handleTogglePaid}
+            onToggleStatement={handleToggleStatement}
           />
         ))}
       </div>
