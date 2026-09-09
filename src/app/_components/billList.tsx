@@ -393,9 +393,8 @@ function BillListCard({
                     )}
                   >
                     <div className="flex items-center gap-1.5">
-                      {/* Paid toggle — settles the statement as a unit, the same
-                          write /bnpl's account card makes. A statement has no
-                          per-purchase row here to toggle individually. */}
+                      {/* Settles the statement as a unit — no per-purchase row
+                          exists here. Same write /bnpl's account card makes. */}
                       <button
                         type="button"
                         className={cn(
@@ -471,11 +470,10 @@ export function BillList() {
     new Set(),
   );
 
-  // Cleared from the hook's own `onSettled` off the settling call's variables,
-  // not from per-call `mutate` callbacks: every card shares one mutation
-  // observer, which keeps only the latest call's callbacks — so a second toggle
-  // starting before the first resolves would strand the first key and leave that
-  // statement's button disabled for good. Same reasoning as on /bnpl.
+  // Cleared from the hook's own `onSettled`, not per-call `mutate` callbacks:
+  // every card shares one mutation observer that keeps only the latest call's
+  // callbacks, so overlapping toggles would strand the first key — and leave
+  // that button disabled for good. Same reasoning as on /bnpl.
   const settleStatement = {
     onSettled: (
       _data: unknown,
@@ -498,8 +496,8 @@ export function BillList() {
         clear();
         return;
       }
-      // Stay disabled until the refetch lands, so paidKeys isn't still stale
-      // when the button re-enables — mirrors handleTogglePaid.
+      // Stay disabled until the refetch lands, or paidKeys is still stale when
+      // the button re-enables — as in handleTogglePaid.
       void utils.payment.getAll.invalidate().finally(clear);
     },
   };
