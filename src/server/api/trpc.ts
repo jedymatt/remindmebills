@@ -11,6 +11,7 @@ import superjson from "superjson";
 import { ZodError } from "zod";
 import { auth } from "~/server/auth";
 import { db } from "../db";
+import { ensureDatabaseIndexes } from "../db/indexes";
 
 /**
  * 1. CONTEXT
@@ -25,6 +26,8 @@ import { db } from "../db";
  * @see https://trpc.io/docs/server/context
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
+  await ensureDatabaseIndexes(db);
+
   const session = await auth.api.getSession({
     headers: opts.headers,
   });

@@ -102,9 +102,9 @@ export const paymentRouter = createTRPCRouter({
       const occurrenceDate = truncateToUtcDateOnly(input.occurrenceDate);
 
       // Upsert on the (userId, billId, occurrenceDate) identity so re-marking the
-      // same occurrence refreshes paidAt rather than adding a row. Without a
-      // unique index, truly concurrent upserts can still race to insert
-      // duplicates — deferred; markUnpaid's deleteMany clears any that appear.
+      // same occurrence refreshes paidAt rather than adding a row. The payments
+      // collection has a unique compound index for this identity; markUnpaid uses
+      // deleteMany as a defensive cleanup for any historical duplicates.
       await ctx.db.collection<WithoutId<PaymentDoc>>("payments").updateOne(
         { userId: userOid, billId: billOid, occurrenceDate },
         { $set: { paidAt: new Date() } },
