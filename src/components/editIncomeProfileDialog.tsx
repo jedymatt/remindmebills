@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { isFuture } from "date-fns";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "~/components/ui/button";
@@ -31,21 +31,30 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { utcDateOnlyToLocal } from "~/lib/date-utils";
+import {
+  PayDaysSchema,
+  PayFrequencySchema,
+  refineIncomeFields,
+} from "~/schemas/income";
 import { api } from "~/trpc/react";
 import { DatePicker } from "./datePicker";
+import { PayDaySelect } from "./payDaySelect";
 import type { IncomeProfile } from "~/types";
 
-const EditIncomeProfileSchema = z.object({
-  payFrequency: z.enum(["weekly", "fortnightly", "monthly"]),
-  // startDate is canonical UTC midnight; compare its calendar day (not the raw
-  // instant) so picking "today" is never treated as future in +offset zones.
-  startDate: z.coerce
-    .date<Date>()
-    .refine((val) => !isFuture(utcDateOnlyToLocal(val)), {
-      message: "No future dates allowed",
-    }),
-  amount: z.number().min(0, "Amount must be 0 or more").optional(),
-});
+const EditIncomeProfileSchema = z
+  .object({
+    payFrequency: PayFrequencySchema,
+    payDays: PayDaysSchema.optional(),
+    // startDate is canonical UTC midnight; compare its calendar day (not the raw
+    // instant) so picking "today" is never treated as future in +offset zones.
+    startDate: z.coerce
+      .date<Date>()
+      .refine((val) => !isFuture(utcDateOnlyToLocal(val)), {
+        message: "No future dates allowed",
+      }),
+    amount: z.number().min(0, "Amount must be 0 or more").optional(),
+  })
+  .superRefine(refineIncomeFields);
 
 type EditIncomeProfileValues = z.infer<typeof EditIncomeProfileSchema>;
 
@@ -62,9 +71,18 @@ export function EditIncomeProfileDialog({
     resolver: zodResolver(EditIncomeProfileSchema),
     defaultValues: {
       payFrequency: currentProfile.payFrequency,
+      payDays:
+        currentProfile.payFrequency === "semimonthly"
+          ? currentProfile.payDays
+          : undefined,
       startDate: currentProfile.startDate,
       amount: currentProfile.amount,
     },
+  });
+
+  const payFrequency = useWatch({
+    control: form.control,
+    name: "payFrequency",
   });
 
   const utils = api.useUtils();
@@ -110,12 +128,45 @@ export function EditIncomeProfileDialog({
                       <SelectItem value="weekly">Weekly</SelectItem>
                       <SelectItem value="fortnightly">Fortnightly</SelectItem>
                       <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="semimonthly">Semi-monthly</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
+            {payFrequency === "semimonthly" && (
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="payDays.0"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First payday</FormLabel>
+                      <PayDaySelect
+                        value={field.value}
+                        onChange={field.onChange}
+                      />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="payDays.1"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Second payday</FormLabel>
+                      <PayDaySelect
+                        value={field.value}
+                        onChange={field.onChange}
+                      />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
             <FormField
               control={form.control}
               name="startDate"
@@ -155,10 +206,7 @@ export function EditIncomeProfileDialog({
               )}
             />
             <DialogFooter>
-              <Button
-                type="submit"
-                disabled={form.formState.isSubmitting}
-              >
+              <Button type="submit" disabled={form.formState.isSubmitting}>
                 Save Changes
               </Button>
             </DialogFooter>

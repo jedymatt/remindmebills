@@ -2,6 +2,11 @@ import { ObjectId } from "mongodb";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import type { IncomeProfile } from "~/types";
 import { roundToUtcDateOnly } from "~/lib/date-utils";
+import {
+  PayDaysSchema,
+  PayFrequencySchema,
+  refineIncomeFields,
+} from "~/schemas/income";
 import { z } from "zod";
 
 export const incomeRouter = createTRPCRouter({
@@ -22,20 +27,36 @@ export const incomeRouter = createTRPCRouter({
   }),
 
   createIncomeProfile: protectedProcedure
+    // A discriminated union rather than an optional `payDays`, so the shape the
+    // caller must send matches the `IncomeProfile` union it becomes and the
+    // handler needs no assertion to know `payDays` is there.
     .input(
-      z.object({
-        payFrequency: z.enum(["weekly", "fortnightly", "monthly"]),
-        startDate: z.date(),
-      }),
+      z.discriminatedUnion("payFrequency", [
+        z.object({
+          payFrequency: z.enum(["weekly", "fortnightly", "monthly"]),
+          startDate: z.date(),
+        }),
+        z.object({
+          payFrequency: z.literal("semimonthly"),
+          payDays: PayDaysSchema,
+          startDate: z.date(),
+        }),
+      ]),
     )
     .mutation(async ({ ctx, input }) => {
-      const { payFrequency, startDate } = input;
-
-      const incomeProfile = {
+      const identity = {
         userId: new ObjectId(ctx.session.user.id),
-        payFrequency,
-        startDate: roundToUtcDateOnly(startDate),
+        startDate: roundToUtcDateOnly(input.startDate),
       };
+
+      const incomeProfile =
+        input.payFrequency === "semimonthly"
+          ? {
+              ...identity,
+              payFrequency: input.payFrequency,
+              payDays: input.payDays,
+            }
+          : { ...identity, payFrequency: input.payFrequency };
 
       await ctx.db
         .collection<IncomeProfile>("income_profiles")
@@ -43,26 +64,47 @@ export const incomeRouter = createTRPCRouter({
     }),
 
   updateIncomeProfile: protectedProcedure
+    // Every field is optional here, so the discriminant cannot carry the
+    // `payDays` requirement the way it does on create; the shared refinement
+    // states it instead.
     .input(
-      z.object({
-        payFrequency: z.enum(["weekly", "fortnightly", "monthly"]).optional(),
-        startDate: z.date().optional(),
-        amount: z.number().min(0).optional(),
-      }),
+      z
+        .object({
+          payFrequency: PayFrequencySchema.optional(),
+          payDays: PayDaysSchema.optional(),
+          startDate: z.date().optional(),
+          amount: z.number().min(0).optional(),
+        })
+        .superRefine((values, ctx) => {
+          if (values.payFrequency === undefined) return;
+          refineIncomeFields(
+            { ...values, payFrequency: values.payFrequency },
+            ctx,
+          );
+        }),
     )
     .mutation(async ({ ctx, input }) => {
       const updateFields: Record<string, unknown> = {};
       if (input.payFrequency !== undefined)
         updateFields.payFrequency = input.payFrequency;
+      if (input.payDays !== undefined) updateFields.payDays = input.payDays;
       if (input.startDate !== undefined)
         updateFields.startDate = roundToUtcDateOnly(input.startDate);
       if (input.amount !== undefined) updateFields.amount = input.amount;
+
+      // Moving off semi-monthly leaves paydays that no longer mean anything and
+      // that the IncomeProfile union says cannot be there.
+      const switchedAwayFromSemiMonthly =
+        input.payFrequency !== undefined &&
+        input.payFrequency !== "semimonthly";
 
       await ctx.db
         .collection<IncomeProfile>("income_profiles")
         .updateOne(
           { userId: new ObjectId(ctx.session.user.id) },
-          { $set: updateFields },
+          switchedAwayFromSemiMonthly
+            ? { $set: updateFields, $unset: { payDays: "" } }
+            : { $set: updateFields },
         );
     }),
 });

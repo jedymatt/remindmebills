@@ -7,9 +7,15 @@ import { Button } from "~/components/ui/button";
 import { EditIncomeProfileDialog } from "./editIncomeProfileDialog";
 import type { IncomeProfile } from "~/types";
 
-function formatFrequency(freq: string) {
-  return freq.charAt(0).toUpperCase() + freq.slice(1);
-}
+// Capitalising the stored value cannot produce "Semi-monthly" from
+// "semimonthly", and a Record keyed on the union makes a new frequency a
+// compile error here rather than a mis-rendered label.
+const FREQUENCY_LABELS: Record<IncomeProfile["payFrequency"], string> = {
+  weekly: "Weekly",
+  fortnightly: "Fortnightly",
+  monthly: "Monthly",
+  semimonthly: "Semi-monthly",
+};
 
 export function IncomeProfileSection({
   incomeProfile,
@@ -24,7 +30,7 @@ export function IncomeProfileSection({
         <div>
           <span className="text-muted-foreground">Pay Frequency: </span>
           <span className="font-medium">
-            {formatFrequency(incomeProfile.payFrequency)}
+            {FREQUENCY_LABELS[incomeProfile.payFrequency]}
           </span>
         </div>
         <div>
@@ -45,11 +51,7 @@ export function IncomeProfileSection({
           </span>
         </div>
       </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => setEditOpen(true)}
-      >
+      <Button variant="ghost" size="icon" onClick={() => setEditOpen(true)}>
         <Pencil className="size-4" />
       </Button>
       <EditIncomeProfileDialog

@@ -54,6 +54,16 @@ type SummaryCard = {
   valueClassName?: string;
 };
 
+// The frequency this replaced fell through to "month" for anything it did not
+// name, which silently mislabelled semi-monthly income. A Record keyed on the
+// union cannot fall through.
+const INCOME_PERIOD_NOUNS: Record<IncomeProfile["payFrequency"], string> = {
+  weekly: "week",
+  fortnightly: "fortnight",
+  monthly: "month",
+  semimonthly: "pay period",
+};
+
 export function FinancialSummaryCards({
   incomeProfile,
   bills,
@@ -136,7 +146,7 @@ export function FinancialSummaryCards({
       icon: Wallet,
       label: "Income",
       value: income > 0 ? formatPHP(income) : "Not set",
-      subtitle: `Per ${incomeProfile.payFrequency === "fortnightly" ? "fortnight" : incomeProfile.payFrequency === "weekly" ? "week" : "month"}`,
+      subtitle: `Per ${INCOME_PERIOD_NOUNS[incomeProfile.payFrequency]}`,
       mono: true,
     },
     {
