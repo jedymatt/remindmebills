@@ -35,6 +35,5 @@ Better Auth sign-in, cookie-based, works headlessly via Playwright.
   `"yyyy-MM-dd"` works.
 - Guest data persists in MongoDB per anonymous user; each fresh browser
   context starts clean.
-- Expected noise: Better Auth "Base URL could not be determined" WARNs when
-  `BETTER_AUTH_URL` is unset locally; Radix "Missing Description for
-  DialogContent" browser warnings. Both pre-existing.
+- Expected noise: Radix "Missing Description for DialogContent" browser
+  warnings. Pre-existing.
