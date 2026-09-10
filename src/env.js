@@ -36,7 +36,12 @@ export const env = createEnv({
   runtimeEnv: {
     MONGODB_URI: process.env.MONGODB_URI,
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
-    BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
+    // Vercel gives every deployment a VERCEL_URL but no stable base URL to
+    // configure ahead of time, so preview builds fall back to their own
+    // deployment URL. Production sets BETTER_AUTH_URL explicitly.
+    BETTER_AUTH_URL:
+      process.env.BETTER_AUTH_URL ??
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined),
     AUTH_GOOGLE_ID: process.env.AUTH_GOOGLE_ID,
     AUTH_GOOGLE_SECRET: process.env.AUTH_GOOGLE_SECRET,
     NODE_ENV: process.env.NODE_ENV,
